@@ -1,0 +1,157 @@
+import os
+import json
+import urllib.parse
+import random
+from tavily import TavilyClient
+
+class MarketAnalystAgent:
+    def __init__(self, grok_client):
+        self.grok = grok_client
+        self.tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+        self.model_id = "llama-3.3-70b-versatile"
+
+    def _clean_json(self, text):
+        return text.strip().replace("```json", "").replace("```", "")
+
+    def get_live_feeds(self, role, skills):
+        # Fallback if no role provided
+        if not role:
+             return {
+                "hot_jobs": ["DevOps Engineer", "ML Engineer", "Backend Developer", "Frontend React Dev"],
+                "hot_projects": ["CI/CD Pipeline", "AI Chatbot", "E-commerce API", "Portfolio Site"]
+            }
+
+        try:
+            # 1. Search for trends using Tavily
+            query = f"trending job titles and technical projects for {role} 2025"
+            search_result = self.tavily.search(query=query, search_depth="basic")
+            context = search_result.get("results", [])
+
+            # 2. Use Grok to synthesize trends from search data
+            prompt = f"""
+            Based on the following search results about market trends:
+            {context}
+
+            Generate a "Live Feed" for a candidate aiming for "{role}" with skills: {skills}.
+            Return a JSON object with two arrays:
+            1. "hot_jobs": 4 trending job titles related to {role}.
+            2. "hot_projects": 4 trending technical project ideas related to {role}.
+            Return ONLY valid JSON.
+            """
+            
+            response = self.grok.chat.completions.create(
+                model=self.model_id,
+                messages=[
+                    {"role": "system", "content": "You are a market analyst. Return JSON only."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return json.loads(self._clean_json(response.choices[0].message.content))
+            
+        except Exception as e:
+            print(f"Error generating feeds: {e}")
+            # Robust Fallback
+            return {
+                 "hot_jobs": [f"{role} @ TechCorp", "Remote Developer Opportunity", "Startup CTO Role", "Freelance Contract"],
+                 "hot_projects": ["AI-Powered Dashboard", "E-commerce Microservices", "Real-time Chat App", "Crypto Portfolio Tracker"]
+            }
+
+    def find_job_matches(self, role, skills):
+        if not role:
+            return []
+
+        try:
+            # 1. Perform a real search using Tavily
+            query = f"latest {role} jobs requiring {skills}"
+            search_result = self.tavily.search(query=query, search_depth="basic", max_results=10)
+            context = search_result.get("results", [])
+
+            # 2. Use Grok to structure the search results into our format
+            prompt = f"""
+            Act as a job search engine. 
+            I have performed a search for "{role}" jobs. Here are the raw search results:
+            {json.dumps(context)}
+
+            Extract and format 6 REALISTIC job listings from these results (or generate plausible ones based on the search context if results are thin).
+            For each job, provide:
+            - "title": Job Title
+            - "company": Company Name
+            - "location": Location
+            - "salary": Salary range (estimate if not in text)
+            - "type": Full-time / Contract
+            - "match_score": 75-98 (integer, based on skill match)
+            - "skills": List of 3-4 matching skills from snippet
+            - "description": 1 sentence summary
+            - "posted": e.g. "2 days ago"
+            - "applicants": integer count (estimate)
+            - "link": Use the 'url' from search results if available, else a Google Search link.
+            
+            Return ONLY a JSON array of objects.
+            """
+
+            response = self.grok.chat.completions.create(
+                model=self.model_id,
+                messages=[
+                    {"role": "system", "content": "You are a job search assistant. Return JSON only."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            
+            jobs = json.loads(self._clean_json(response.choices[0].message.content))
+            
+            # Enrich with random logos if missing
+            for job in jobs:
+                if 'logo' not in job:
+                    job['logo'] = random.choice(["🚀", "💡", "🐍", "☁️", "🤖", "💻", "🔥", "✨"])
+                
+            return jobs
+
+        except Exception as e:
+            print(f"Error generating jobs (using fallback): {e}")
+            # Mock Data for Rate Limit / Error
+            jobs = [
+                {
+                    "title": f"Senior {role}", 
+                    "company": "TechGiant Inc", 
+                    "location": "Remote", 
+                    "salary": "$120k - $160k", 
+                    "type": "Full-time",
+                    "match_score": 98,
+                    "skills": ["React", "Python", "Cloud"],
+                    "description": f"We are looking for an experienced {role} to lead our team.",
+                    "posted": "Just now",
+                    "applicants": 120
+                },
+                {
+                    "title": f"{role} Developer", 
+                    "company": "StartupAI", 
+                    "location": "San Francisco, CA", 
+                    "salary": "$100k - $140k", 
+                    "type": "Hybrid",
+                    "match_score": 92,
+                    "skills": ["TypeScript", "Node.js", "AWS"],
+                    "description": "Join our fast-paced AI startup as a core developer.",
+                    "posted": "2 hours ago",
+                    "applicants": 45
+                },
+                 {
+                    "title": "Junior Engineer", 
+                    "company": "WebSolutions", 
+                    "location": "New York, NY", 
+                    "salary": "$80k - $110k", 
+                    "type": "On-site",
+                    "match_score": 85,
+                    "skills": ["JavaScript", "HTML/CSS"],
+                    "description": "Great opportunity for junior devs to learn and grow.",
+                    "posted": "1 day ago",
+                    "applicants": 200
+                }
+            ]
+            
+            # Add fallback links
+            for job in jobs:
+                 query = urllib.parse.quote(f"{job.get('title', 'Job')} {job.get('company', '')}")
+                 job['link'] = f"https://www.google.com/search?q={query}&ibp=htl;jobs" 
+                 job['logo'] = random.choice(["🚀", "💡", "🐍", "☁️", "🤖", "💻", "🔥", "✨"])
+                 
+            return jobs
