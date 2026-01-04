@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
     Upload, FileText, CheckCircle, ArrowLeft, X, Briefcase,
-    MessageCircle, Send, Bot, Sparkles
+    MessageCircle, Send, Bot, Sparkles, Plus, History, Copy, Edit
 } from "lucide-react";
 import axios from "axios";
 import { useProgressStore } from "../store/useProgressStore";
@@ -32,6 +32,82 @@ export default function CareerGuidance() {
     const [chatInput, setChatInput] = useState("");
     const [isTyping, setIsTyping] = useState(false); // Define isTyping state
     const messagesEndRef = useRef(null);
+
+    // --- Persistence & History State ---
+    const [sessionId, setSessionId] = useState(localStorage.getItem("active_chat_session") || null);
+    const [chatHistoryList, setChatHistoryList] = useState([]);
+    const [showHistory, setShowHistory] = useState(false);
+
+    useEffect(() => {
+        // Load session if exists
+        if (sessionId) {
+            loadChatHistory(sessionId);
+        } else {
+            createNewSession();
+        }
+        loadAllSessions();
+    }, [sessionId]);
+
+    const createNewSession = async () => {
+        try {
+            const res = await axios.post("http://localhost:8000/chat/new");
+            const newId = res.data.session_id;
+            setSessionId(newId);
+            localStorage.setItem("active_chat_session", newId);
+            setMessages([
+                {
+                    id: 'intro',
+                    text: "Hello! I'm your career assistant. I can help you analyze your resume gaps, suggest projects, or refine your roadmap. Ask me anything!",
+                    sender: "bot",
+                    timestamp: new Date()
+                }
+            ]);
+            loadAllSessions();
+        } catch (e) {
+            console.error("Failed to create session", e);
+        }
+    };
+
+    const loadChatHistory = async (sessId) => {
+        try {
+            const res = await axios.get(`http://localhost:8000/chat/history/${sessId}`);
+            // Transform to UI format
+            const hist = res.data.messages.map((m, i) => ({
+                id: i,
+                text: m.content,
+                sender: m.role === 'assistant' ? 'bot' : m.role,
+                timestamp: new Date()
+            }));
+
+            if (hist.length === 0) {
+                setMessages([
+                    {
+                        id: 'intro',
+                        text: "Hello! I'm your career assistant. I can help you analyze your resume gaps, suggest projects, or refine your roadmap. Ask me anything!",
+                        sender: "bot",
+                        timestamp: new Date()
+                    }
+                ]);
+            } else {
+                setMessages(hist);
+            }
+        } catch (e) {
+            console.error("Failed to load history", e);
+        }
+    };
+
+    const loadAllSessions = async () => {
+        try {
+            const res = await axios.get("http://localhost:8000/chat/sessions");
+            setChatHistoryList(res.data);
+        } catch (e) { console.error(e); }
+    }
+
+    const switchSession = (id) => {
+        setSessionId(id);
+        localStorage.setItem("active_chat_session", id);
+        setShowHistory(false);
+    };
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -91,9 +167,11 @@ export default function CareerGuidance() {
         setIsTyping(true);
 
         try {
-            const formData = new FormData();
-            formData.append("message", userMsg.text);
-            const res = await axios.post("http://localhost:8000/chat", formData);
+            // Updated to send JSON with session_id
+            const res = await axios.post("http://localhost:8000/chat", {
+                message: userMsg.text,
+                session_id: sessionId
+            });
             let responseText = res.data.response;
 
             // Check for JSON block (Project Generation)
@@ -269,24 +347,76 @@ export default function CareerGuidance() {
 
                 {/* RIGHT: Chat */}
                 <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6 flex flex-col h-[600px]">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                            <MessageCircle className="text-blue-400" />
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                <MessageCircle className="text-blue-400" />
+                            </div>
+                            <h2 className="text-xl font-bold text-white">Career Mentor AI</h2>
                         </div>
-                        <h2 className="text-xl font-bold text-white">Career Mentor AI</h2>
+
+                        <div className="flex gap-2 relative">
+                            <button
+                                onClick={() => setShowHistory(!showHistory)}
+                                className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors"
+                                title="Chat History"
+                            >
+                                <History size={20} />
+                            </button>
+                            <button
+                                onClick={createNewSession}
+                                className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors"
+                                title="New Chat"
+                            >
+                                <Plus size={20} />
+                            </button>
+
+                            {/* History Dropdown */}
+                            {showHistory && (
+                                <div className="absolute top-12 right-0 w-64 bg-gray-900 border border-gray-700 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto">
+                                    {chatHistoryList.map(s => (
+                                        <div
+                                            key={s.id}
+                                            onClick={() => switchSession(s.id)}
+                                            className={`p-3 border-b border-gray-800 hover:bg-gray-800 cursor-pointer text-sm truncate ${s.id === sessionId ? 'bg-gray-800 text-neon' : 'text-gray-400'}`}
+                                        >
+                                            {s.title}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4 scrollbar-thin scrollbar-thumb-gray-700">
                         {messages.map((msg) => (
-                            <div key={msg.id} className={`flex gap-3 ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
+                            <div key={msg.id} className={`group flex gap-3 ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
                                 {msg.sender === "bot" && <div className="w-8 h-8 rounded-full bg-neon/20 flex items-center justify-center"><Bot size={16} className="text-neon" /></div>}
 
-                                <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.sender === "user"
+                                <div className={`relative max-w-[80%] p-3 rounded-2xl text-sm ${msg.sender === "user"
                                     ? "bg-blue-600 text-white rounded-tr-none"
                                     : "bg-gray-800 text-gray-200 border border-gray-700 rounded-tl-none"
                                     }`}>
                                     {/* Pure text for safety */}
                                     <p className="whitespace-pre-wrap">{msg.text}</p>
+
+                                    {/* Copy / Edit Actions */}
+                                    <div className={`absolute -bottom-6 ${msg.sender === 'user' ? 'right-0' : 'left-0'} flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                                        <button
+                                            onClick={() => navigator.clipboard.writeText(msg.text)}
+                                            className="text-gray-500 hover:text-white p-1" title="Copy"
+                                        >
+                                            <Copy size={12} />
+                                        </button>
+                                        {msg.sender === 'user' && (
+                                            <button
+                                                onClick={() => setChatInput(msg.text)}
+                                                className="text-gray-500 hover:text-white p-1" title="Edit"
+                                            >
+                                                <Edit size={12} />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -303,7 +433,7 @@ export default function CareerGuidance() {
                             placeholder="Ask about your resume..."
                             className="flex-1 bg-gray-800 border-gray-700 rounded-xl px-4 text-white focus:border-neon outline-none"
                         />
-                        <button onClick={handleSendChat} className="p-3 bg-neon text-black rounded-xl hover:bg-neon/80">
+                        <button onClick={handleSendChat} className="p-3 bg-neon text-black rounded-xl hover:bg-neon/80 flex items-center justify-center transition-colors">
                             <Send size={20} />
                         </button>
                     </div>

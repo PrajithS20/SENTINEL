@@ -50,6 +50,65 @@ def init_db():
     except sqlite3.OperationalError:
         pass
         
+    # NEW: Chat History Tables
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+            id TEXT PRIMARY KEY,
+            title TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''') 
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT,
+            role TEXT,
+            content TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+
+def create_chat_session(session_id, title="New Chat"):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('INSERT OR IGNORE INTO chat_sessions (id, title) VALUES (?, ?)', (session_id, title))
+    conn.commit()
+    conn.close()
+
+def save_chat_message(session_id, role, content):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO chat_messages (session_id, role, content) VALUES (?, ?, ?)', (session_id, role, content))
+    conn.commit()
+    conn.close()
+
+def get_chat_history(session_id):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute('SELECT role, content FROM chat_messages WHERE session_id = ? ORDER BY id ASC', (session_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"role": r["role"], "content": r["content"]} for r in rows]
+
+def get_all_chat_sessions():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM chat_sessions ORDER BY created_at DESC')
+    rows = cursor.fetchall()
+    conn.close()
+    return [{"id": r["id"], "title": r["title"], "created_at": r["created_at"]} for r in rows]
+
+def rename_chat_session(session_id, new_title):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('UPDATE chat_sessions SET title = ? WHERE id = ?', (new_title, session_id))
     conn.commit()
     conn.close()
 

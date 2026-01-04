@@ -109,29 +109,69 @@ async def get_market_matching():
         "stage": history['growth_stage']
     }
 
+# --- Persistent Chat API ---
+
+class ChatRequest(BaseModel):
+    message: str
+    session_id: str
+
+@app.get("/chat/sessions")
+async def get_chat_sessions():
+    return database.get_all_chat_sessions()
+
+@app.post("/chat/new")
+async def create_new_chat():
+    session_id = f"chat_{int(time.time())}"
+    database.create_chat_session(session_id, "New Chat")
+    return {"session_id": session_id, "title": "New Chat"}
+
+@app.get("/chat/history/{session_id}")
+async def get_history_by_session(session_id: str):
+    history = database.get_chat_history(session_id)
+    return {"messages": history}
+
 @app.post("/chat")
-async def career_chat(message: str = Form(...)):
+async def career_chat(req: ChatRequest):
     history = database.get_latest_profile()
     if not history:
         return {"response": "Please upload a resume first."}
         
-    context = (
+    # Check if session exists, if not create (auto-recovery)
+    if not database.get_chat_history(req.session_id) and len(database.get_chat_history(req.session_id)) == 0:
+        database.create_chat_session(req.session_id, f"Chat about {req.message[:20]}...")
+
+    # Load Past Context
+    past_msgs = database.get_chat_history(req.session_id)
+    chat_context = [{"role": m["role"], "content": m["content"]} for m in past_msgs]
+    
+    # Save User Msg
+    database.save_chat_message(req.session_id, "user", req.message)
+    
+    context_system = (
         f"User is a {history['role']} with skills: {history['analysis'].get('current_skills', 'N/A')}. "
         "INSTRUCTIONS: Respond in max 3 short paragraphs. Use bullet points. Keep it neat."
     )
     
-    
-    # Use Groq Cloud (Llama 3) here
     try:
+        # Build Messages
+        messages = [{"role": "system", "content": context_system}] + chat_context + [{"role": "user", "content": req.message}]
+
         response = mirror.client.chat.completions.create(
             model="llama-3.3-70b-versatile",
-            messages=[
-
-                {"role": "system", "content": "You are a concise Career Mentor. Respond in plain, simple English. Avoid excessive markdown bolding (**). Keep answers under 3 sentences where possible. \n\nIMPORTANT PROJECT GENERATION RULES:\n1. ONLY generate a JSON block if the user EXPLICITLY asks to 'create', 'generate', 'give', 'change', or 'update' projects.\n2. Do NOT generate JSON for general questions like 'what are my skills' or 'explain python'.\n3. If the user asks for specific difficulty levels (e.g., 'give me medium projects'), ONLY generate projects for that level.\n4. If the user asks for projects by TOPIC but DOES NOT specify a level (e.g., 'give me python projects'), generate valid projects for ALL THREE LEVELS (3 Easy, 3 Medium, 3 Hard) to complete the set.\n5. Format: Append a single JSON block at the end: ```json { \"projects\": [ { \"id\": \"unique-id\", \"title\": \"Title\", \"description\": \"Desc\", \"tech\": [\"Tag\"], \"difficulty\": \"Easy/Medium/Hard\", \"icon\": \"code\", \"color\": \"from-blue-500 to-cyan-500\" } ] } ```. ensure 'id' and 'difficulty' are PRESENT."},
-                {"role": "user", "content": f"{context}\nUser Question: {message}\n(Respond simply and precisely)"}
-            ]
+            messages=messages
         )
-        return {"response": response.choices[0].message.content}
+        reply = response.choices[0].message.content
+        
+        # Save Bot Msg
+        database.save_chat_message(req.session_id, "assistant", reply)
+        
+        # Auto-Rename if first message
+        if len(past_msgs) == 0:
+             # Simple rename logic (could use AI)
+             new_title = req.message.split('\n')[0][:30]
+             database.rename_chat_session(req.session_id, new_title)
+
+        return {"response": reply}
     except Exception as e:
         return {"response": f"I'm having trouble thinking right now. ({str(e)})"}
 
