@@ -236,3 +236,35 @@ def delete_profile(profile_id):
     conn.commit() # Save the deletion to disk
     conn.close()
     return True
+
+def delete_project(project_id):
+    """Deletes a project from the global projects table."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM projects WHERE id = ?', (project_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+def update_latest_profile_projects(projects):
+    """Updates the projects_json for the most recent profile."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Get latest ID
+    cursor.execute('SELECT id FROM profiles ORDER BY timestamp DESC LIMIT 1')
+    row = cursor.fetchone()
+    
+    if row:
+        profile_id = row[0]
+        # Convert Pydantic objects if needed, or raw dicts
+        projects_list = [p if isinstance(p, dict) else p.model_dump() for p in projects]
+        
+        cursor.execute('UPDATE profiles SET projects_json = ? WHERE id = ?', 
+                      (json.dumps(projects_list), profile_id))
+        conn.commit()
+        conn.close()
+        return True
+    
+    conn.close()
+    return False

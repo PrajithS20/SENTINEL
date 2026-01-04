@@ -11,6 +11,7 @@ from mirror_agent import MirrorAgent
 from lab_agent import LabAgent
 from foundry_agent import FoundryAgent
 from market_agent import MarketAnalystAgent
+from resume_agent import ResumeAgent
 
 load_dotenv()
 database.init_db()
@@ -23,6 +24,7 @@ mirror = MirrorAgent()
 lab = LabAgent(mirror.client)
 market = MarketAnalystAgent(mirror.client)
 foundry = FoundryAgent(mirror.client)
+resume_bot = ResumeAgent(mirror.client)
 
 # --- Foundry API Models & Endpoints ---
 class FoundryChatRequest(BaseModel):
@@ -80,6 +82,19 @@ async def process_career_cycle(file: UploadFile = File(...), target_role: str = 
         print(f"Analysis Error: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
+class UpdateProjectsRequest(BaseModel):
+    projects: list
+
+@app.post("/update-generated-projects")
+async def update_generated_projects(req: UpdateProjectsRequest):
+    try:
+        success = database.update_latest_profile_projects(req.projects)
+        if success:
+            return {"status": "updated"}
+        return {"status": "no_profile_found"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
 @app.get("/market-match")
 async def get_market_matching():
     # Frontend calls this on refresh to restore the dashboard
@@ -112,7 +127,7 @@ async def career_chat(message: str = Form(...)):
             model="llama-3.3-70b-versatile",
             messages=[
 
-                {"role": "system", "content": "You are a concise Career Mentor. Respond in plain, simple English. Avoid excessive markdown bolding (**). Keep answers under 3 sentences where possible."},
+                {"role": "system", "content": "You are a concise Career Mentor. Respond in plain, simple English. Avoid excessive markdown bolding (**). Keep answers under 3 sentences where possible. \n\nIMPORTANT PROJECT GENERATION RULES:\n1. ONLY generate a JSON block if the user EXPLICITLY asks to 'create', 'generate', 'give', 'change', or 'update' projects.\n2. Do NOT generate JSON for general questions like 'what are my skills' or 'explain python'.\n3. If the user asks for specific difficulty levels (e.g., 'give me medium projects'), ONLY generate projects for that level.\n4. If the user asks for projects by TOPIC but DOES NOT specify a level (e.g., 'give me python projects'), generate valid projects for ALL THREE LEVELS (3 Easy, 3 Medium, 3 Hard) to complete the set.\n5. Format: Append a single JSON block at the end: ```json { \"projects\": [ { \"id\": \"unique-id\", \"title\": \"Title\", \"description\": \"Desc\", \"tech\": [\"Tag\"], \"difficulty\": \"Easy/Medium/Hard\", \"icon\": \"code\", \"color\": \"from-blue-500 to-cyan-500\" } ] } ```. ensure 'id' and 'difficulty' are PRESENT."},
                 {"role": "user", "content": f"{context}\nUser Question: {message}\n(Respond simply and precisely)"}
             ]
         )
@@ -139,6 +154,24 @@ async def delete_history_item(profile_id: int):
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
     
+
+# --- Resume Builder API ---
+
+class ResumeBuildRequest(BaseModel):
+    job_description: str
+
+@app.post("/resume/build")
+async def build_resume(req: ResumeBuildRequest):
+    try:
+        # Gather Context
+        profile = database.get_latest_profile() or {}
+        # Get projects user actually WORKED on (from 'My Lab')
+        active_projects = database.get_all_active_projects() 
+        
+        result = resume_bot.generate_resume_content(profile, active_projects, req.job_description)
+        return result
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 # --- New Endpoints for Frontend Alignment ---
 
@@ -241,6 +274,14 @@ async def unlock_phase(req: UpdatePhaseRequest):
     except Exception as e:
         print(f"Unlock Error: {e}")
         return {"status": "error"}
+
+@app.delete("/project/{project_id}")
+async def delete_project(project_id: str):
+    try:
+        database.delete_project(project_id)
+        return {"status": "deleted"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 # --- SESSION & COLLABORATION API ---
 import random

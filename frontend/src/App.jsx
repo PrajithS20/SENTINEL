@@ -12,9 +12,11 @@ import JobHub from "./pages/JobHub";
 import MyWorkspace from "./pages/MyWorkspace";
 import MyWorkspaceOverview from "./pages/MyWorkspaceOverview";
 import GroupSession from "./pages/GroupSession";
+import CareerGuidance from "./pages/CareerGuidance";
 import MyLearning from "./pages/MyLearning";
 import ProjectPhases from "./pages/ProjectPhases";
 import TheFoundry from "./pages/TheFoundry";
+import ResumeBuilder from "./pages/ResumeBuilder";
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -52,7 +54,9 @@ export default function App() {
             <Route path="/project-lab" element={<ProjectLab />} />
             <Route path="/my-lab" element={<MyWorkspaceOverview />} />
             <Route path="/collaborate" element={<GroupSession />} />
+            <Route path="/career-guidance" element={<CareerGuidance />} />
             <Route path="/upload-resume" element={<UploadResume />} />
+            <Route path="/resume-builder" element={<ResumeBuilder />} />
             <Route path="/career-chatbot" element={<CareerChatbot />} />
             <Route path="/resources" element={<Resources />} />
             <Route path="/offline-atlas" element={<OfflineAtlas />} />

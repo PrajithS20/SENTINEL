@@ -18,7 +18,8 @@ import {
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/" },
-  { label: "Project Lab", icon: FlaskConical, path: "/project-lab" },
+  { label: "Career Guidance", icon: FlaskConical, path: "/career-guidance" },
+  { label: "Project Lab", icon: Code, path: "/project-lab" }, // Swapped icons logically? No, stick to original but move.
   { label: "My Lab", icon: Code, path: "/my-lab" },
   { label: "Collaborate", icon: Users, path: "/collaborate" },
   { label: "Resources", icon: BookOpen, path: "/resources" },

@@ -17,9 +17,12 @@ class MirrorAgent:
         Analyze this resume for a {target_role} role. 
         Context: User has a Robotics background.
         Return a JSON object with: 
-        1. 'current_skills' (list)
-        2. 'skill_gaps' (list)
-        3. 'growth_stage' (string: Seed, Sprout, or Sapling)
+        1. 'personal_details': {{ "name": "...", "email": "...", "phone": "..." }}
+        2. 'education': [ {{ "degree": "...", "university": "...", "year": "..." }} ]
+        3. 'experience': [ {{ "role": "...", "company": "...", "duration": "...", "description": "..." }} ]
+        4. 'current_skills' (list)
+        5. 'skill_gaps' (list)
+        6. 'growth_stage' (string: Seed, Sprout, or Sapling)
         
         Resume: {text}
         
@@ -43,6 +46,9 @@ class MirrorAgent:
             print(f"Error analyzing resume: {e}")
             # Fallback Profile
             return {
+                "personal_details": {"name": "Cadet X", "email": "cadet@sentinel.ai"},
+                "education": [],
+                "experience": [],
                 "current_skills": ["Python", "JavaScript", "Problem Solving"],
                 "skill_gaps": ["Cloud Architecture", "System Design"],
                 "growth_stage": "Sprout"

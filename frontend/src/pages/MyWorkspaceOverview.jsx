@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Code, Globe, Database, Smartphone, Cpu, Play, CheckCircle, Clock } from "lucide-react";
+import { ArrowLeft, Code, Globe, Database, Smartphone, Cpu, Play, CheckCircle, Clock, Trash2 } from "lucide-react";
 import TopBar from "../components/TopBar";
 
 const userWorkspaces = [
@@ -116,15 +116,32 @@ export default function MyWorkspaceOverview() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50 hover:border-cyan-500/50 transition-all duration-300 group"
+                  className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50 hover:border-cyan-500/50 transition-all duration-300 group relative"
                 >
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (confirm("Delete this project?")) {
+                        fetch(`http://localhost:8000/project/${workspace.id}`, { method: 'DELETE' })
+                          .then(() => setWorkspaces(prev => prev.filter(p => p.id !== workspace.id)));
+                      }
+                    }}
+                    className="absolute top-4 right-4 p-2 text-gray-500 hover:text-red-500 bg-black/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all z-10"
+                    title="Delete Project"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+
                   <Link to={`/project/${workspace.id}`} className="block">
+                    {/* ... Existing Card Content ... */}
                     <div className="flex items-start gap-4 mb-4">
+                      {/* ... Icon and Title ... */}
                       <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${workspace.color || 'from-blue-500 to-cyan-600'} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform`}>
                         <DefaultIcon size={24} className="text-white" />
                       </div>
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex items-center gap-2 mb-2 pr-8">
                           <h3 className="text-xl font-bold text-white group-hover:text-cyan-400 transition-colors line-clamp-1">
                             {workspace.title}
                           </h3>
