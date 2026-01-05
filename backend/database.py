@@ -14,6 +14,7 @@ def init_db():
             analysis_json TEXT,
             projects_json TEXT,
             job_matches_json TEXT,
+            job_matches_updated_at DATETIME, -- New column for cache tracking
             active_projects_json TEXT, -- New column for active projects
             current_phase INTEGER DEFAULT 0,
             growth_stage TEXT DEFAULT 'Seed',
@@ -26,6 +27,11 @@ def init_db():
         cursor.execute("ALTER TABLE profiles ADD COLUMN job_matches_json TEXT")
     except sqlite3.OperationalError:
         pass 
+        
+    try:
+        cursor.execute("ALTER TABLE profiles ADD COLUMN job_matches_updated_at DATETIME")
+    except sqlite3.OperationalError:
+        pass
 
     try:
         cursor.execute("ALTER TABLE profiles ADD COLUMN active_projects_json TEXT")
@@ -143,7 +149,7 @@ def update_project_code(project_id, code):
 def update_job_matches(profile_id, job_matches):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute('UPDATE profiles SET job_matches_json = ? WHERE id = ?', (json.dumps(job_matches), profile_id))
+    cursor.execute('UPDATE profiles SET job_matches_json = ?, job_matches_updated_at = CURRENT_TIMESTAMP WHERE id = ?', (json.dumps(job_matches), profile_id))
     conn.commit()
     conn.close()
 
@@ -237,6 +243,9 @@ def get_latest_profile():
         # For active_projects, we now prefer the global table, 
         # but we return empty here to avoid confusion or legacy data.
         active_projects = [] 
+
+        # Handle missing column gracefully during transition
+        updated_at = row["job_matches_updated_at"] if "job_matches_updated_at" in row.keys() else None
             
         return {
             "id": row["id"],
@@ -244,6 +253,7 @@ def get_latest_profile():
             "analysis": json.loads(row["analysis_json"]),
             "projects": json.loads(row["projects_json"]),
             "job_matches": job_matches,
+            "job_matches_updated_at": updated_at,
             "active_projects": active_projects,
             "growth_stage": row["growth_stage"]
         }

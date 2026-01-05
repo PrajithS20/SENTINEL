@@ -1,0 +1,38 @@
+# --- Global ---
+.DS_Store
+Thumbs.db
+*.log
+
+# --- Python / Backend ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+.python-version
+
+# Database (Local)
+*.db
+*.sqlite
+*.sqlite3
+backend/career_sapling.db
+
+# Environment Variables
+.env
+backend/.env
+frontend/.env
+
+# --- Node / Frontend ---
+node_modules/
+dist/
+build/
+.output/
+package-lock.json
+yarn.lock
+
+# --- Editor ---
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -7,11 +7,27 @@
 
 ## 🌟 Key Features
 
-*   **AI Resume Scanner**: Instant SWOT analysis of your technical profile using LLMs.
-*   **The Foundry**: An AI-augmented development environment where you build projects under the guidance of "The Architect" (AI Mentor).
-*   **Automated Verification**: Uses Vision AI ("The Auditor") to verify screenshots of your completed work.
-*   **Live Market Feeds**: Real-time trending jobs and projects fetched via search agents.
-*   **Squad Mode**: Real-time collaborative sessions for team projects.
+### 1. 🧠 AI Career Mentor
+*   **Resume Scanner**: Instant SWOT analysis of your technical profile using LLMs.
+*   **Smart Chat**: Context-aware career guidance that remembers your history (persistent sessions).
+*   **Strategy**: Personalized learning path suggestions based on your resume gaps.
+
+### 2. 🏗️ The Foundry (Project Lab)
+*   **AI-Generated Projects**: Dynamic project briefs generated based on your skill level and market demand.
+*   **"The Architect" (AI Mentor)**: Real-time coding guidance and unblocking within the built-in Monaco Editor.
+*   **Automated Verification**: Uses Vision AI ("The Auditor") to verify screenshots of your completed work before unlocking the next milestone.
+
+### 3. 📄 Resume Architect AI (New!)
+*   **A4 Professional Template**: Automatically formats your profile into a clean, side-by-side (Gray/White) A4 resume.
+*   **Smart Content**: Uses AI to convert your Sentinel Lab projects into professional "STAR" method bullet points.
+*   **Native PDF Export**: High-fidelity PDF export (using browser print) that supports multi-page resumes without breaking layout.
+
+### 4. 💼 Job Hub
+*   **Daily Scraper**: Automatically scrapes and caches fresh job listings from LinkedIn and Indeed every 24 hours.
+*   **Smart Match**: Filters jobs based on your current skill set and project portfolio.
+
+### 5. 👥 Collaborative Squad Mode
+*   **Team Projects**: Join "Squads" to work on larger, complex projects.
 *   **Gamified Growth**: Watch your "Sprout" grow into a tree as you complete milestones.
 
 ---
@@ -23,14 +39,15 @@
 *   **Styling**: Tailwind CSS + Framer Motion
 *   **State Management**: Zustand
 *   **Editor**: Monaco Editor (VS Code web)
+*   **PDF Generation**: Native Browser Print (CSS Media Queries)
 
 ### Backend
 *   **API**: FastAPI (Python)
-*   **Database**: SQLite (Local persistence)
+*   **Database**: SQLite (Local persistence for Profiles, Projects, Chat History, and Job Cache)
 *   **AI Agents**: 
     *   `Llama-3.3-70b` (Logic & Chat)
     *   `Llama-3.2-90b-vision` (Image Verification)
-    *   `Tavily API` (Live Web Search)
+    *   `Tavily API` (Live Web Search & Job Scraping)
 
 ---
 
@@ -114,7 +131,8 @@ npm run dev
     *   Chat with "The Architect" for guidance.
     *   Write code in the editor.
     *   Upload screenshots of your progress to unlock the next phase.
-5.  **Job Hub**: As you skill up, view AI-matched job opportunities.
+5.  **Job Hub**: As you skill up, view AI-matched job opportunities (updated daily).
+6.  **Resume Architect**: Generate a professional PDF resume citing your Sentinel projects.
 
 ---
 

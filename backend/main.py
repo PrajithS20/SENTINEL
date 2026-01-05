@@ -12,6 +12,7 @@ from lab_agent import LabAgent
 from foundry_agent import FoundryAgent
 from market_agent import MarketAnalystAgent
 from resume_agent import ResumeAgent
+from datetime import datetime, timedelta
 
 load_dotenv()
 database.init_db()
@@ -149,7 +150,13 @@ async def career_chat(req: ChatRequest):
     
     context_system = (
         f"User is a {history['role']} with skills: {history['analysis'].get('current_skills', 'N/A')}. "
-        "INSTRUCTIONS: Respond in max 3 short paragraphs. Use bullet points. Keep it neat."
+        "INSTRUCTIONS: Respond in max 3 short paragraphs. Use bullet points. Keep it neat. \n\n"
+        "IMPORTANT PROJECT GENERATION RULES:\n"
+        "1. ONLY generate a JSON block if the user EXPLICITLY asks to 'create', 'generate', 'give', 'change', or 'update' projects.\n"
+        "2. Do NOT generate JSON for general questions like 'what are my skills' or 'explain python'.\n"
+        "3. If the user asks for specific difficulty levels (e.g., 'give me medium projects'), ONLY generate projects for that level.\n"
+        "4. If the user asks for projects by TOPIC but DOES NOT specify a level (e.g., 'give me python projects'), generate valid projects for ALL THREE LEVELS (3 Easy, 3 Medium, 3 Hard) to complete the set.\n"
+        "5. Format: Append a single JSON block at the end: ```json { \"projects\": [ { \"id\": \"unique-id\", \"title\": \"Title\", \"description\": \"Desc\", \"tech\": [\"Tag\"], \"difficulty\": \"Easy/Medium/Hard\", \"icon\": \"code\", \"color\": \"from-blue-500 to-cyan-500\" } ] } ```. ensure 'id' and 'difficulty' are PRESENT."
     )
     
     try:
@@ -231,22 +238,41 @@ async def get_job_matches():
     if not profile:
         return {"jobs": []}
     
-    # Return cached matches if they exist
-    if profile.get('job_matches') and len(profile['job_matches']) > 0:
+    # Check Staleness (24h)
+    should_refresh = True
+    last_updated = profile.get('job_matches_updated_at')
+    
+    if last_updated:
+        try:
+            # Handle potential format variations
+            if isinstance(last_updated, str):
+                # SQLite often returns "YYYY-MM-DD HH:MM:SS"
+                last_dt = datetime.fromisoformat(last_updated) if 'T' in last_updated else datetime.strptime(last_updated, "%Y-%m-%d %H:%M:%S")
+            else:
+                last_dt = last_updated # Already datetime object
+                
+            if datetime.now() - last_dt < timedelta(hours=24):
+                should_refresh = False
+        except Exception as e:
+            print(f"Date parse error: {e}, forcing refresh")
+            should_refresh = True
+            
+    # Return cached matches if valid and exist
+    if not should_refresh and profile.get('job_matches') and len(profile['job_matches']) > 0:
         return {"jobs": profile['job_matches']}
         
-    # Otherwise generate new ones
+    # Otherwise generate new ones (Daily Scrape)
     skills = profile['analysis'].get('current_skills', [])
     jobs = market.find_job_matches(profile['role'], skills)
     
-    # Save to DB for caching
+    # Save to DB (updates timestamp)
     database.update_job_matches(profile['id'], jobs)
     
     return {"jobs": jobs}
 
 # --- Active Projects API ---
 import time
-from datetime import datetime
+
 
 class StartProjectRequest(BaseModel):
     title: str

@@ -62,17 +62,21 @@ class MarketAnalystAgent:
 
         try:
             # 1. Perform a real search using Tavily
-            query = f"latest {role} jobs requiring {skills}"
-            search_result = self.tavily.search(query=query, search_depth="basic", max_results=10)
+            # Targeted query for specific platforms (LinkedIn, Indeed)
+            query = f"latest {role} jobs {skills} (site:linkedin.com/jobs OR site:indeed.com) apply now"
+            search_result = self.tavily.search(query=query, search_depth="basic", max_results=15)
             context = search_result.get("results", [])
 
             # 2. Use Grok to structure the search results into our format
             prompt = f"""
             Act as a job search engine. 
-            I have performed a search for "{role}" jobs. Here are the raw search results:
+            I have performed a search for "{role}" jobs on LinkedIn and Indeed. 
+            Here are the raw search results:
             {json.dumps(context)}
 
-            Extract and format 6 REALISTIC job listings from these results (or generate plausible ones based on the search context if results are thin).
+            Extract and format 6 REALISTIC job listings from these results.
+            CRITICAL: Prioritize finding REAL snippets that look like job postings from LinkedIn or Indeed.
+            
             For each job, provide:
             - "title": Job Title
             - "company": Company Name
@@ -84,7 +88,7 @@ class MarketAnalystAgent:
             - "description": 1 sentence summary
             - "posted": e.g. "2 days ago"
             - "applicants": integer count (estimate)
-            - "link": Use the 'url' from search results if available, else a Google Search link.
+            - "link": The direct URL found in the search result.
             
             Return ONLY a JSON array of objects.
             """

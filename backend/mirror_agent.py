@@ -4,7 +4,7 @@ from openai import OpenAI
 
 class MirrorAgent:
     def __init__(self):
-        self.api_key = os.getenv("GROK_API_KEY")
+        self.api_key = os.getenv("GROQ_API_KEY")
         # Initialize OpenAI client for Groq Cloud
         self.client = OpenAI(
             api_key=self.api_key,

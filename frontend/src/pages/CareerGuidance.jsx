@@ -192,7 +192,17 @@ export default function CareerGuidance() {
                             color: p.color || "from-blue-500 to-cyan-600"
                         }));
 
-                        const currentProjects = store.generatedProjects || [];
+                        // FETCH SOURCE OF TRUTH (Backend) to avoid overwriting existing levels
+                        let currentProjects = [];
+                        try {
+                            const resProx = await axios.get("http://localhost:8000/market-match");
+                            if (resProx.data.projects) {
+                                currentProjects = resProx.data.projects;
+                            }
+                        } catch (err) {
+                            console.warn("Could not fetch existing projects, using store fallback", err);
+                            currentProjects = store.generatedProjects || [];
+                        }
 
                         // 1. Identify which levels are being updated
                         const updatedLevels = new Set();
@@ -220,11 +230,10 @@ export default function CareerGuidance() {
                         setProjects(merged);
 
                         // 4. Persist to Backend (Save for Refresh)
-                        axios.post("http://localhost:8000/update-generated-projects", { projects: merged })
-                            .catch(err => console.error("Failed to save projects persistence:", err));
+                        await axios.post("http://localhost:8000/update-generated-projects", { projects: merged });
 
-                        // Remove JSON from display text
-                        responseText = responseText.replace(/```json[\s\S]*?```/, "").trim();
+                        // Remove JSON from display text (Robust Regex)
+                        responseText = responseText.replace(/```(?:json)?[\s\S]*?```/gi, "").trim();
                         responseText += "\n\n✅ **Project Lab updated!** (Refreshed specific levels)";
                     }
                 } catch (e) {

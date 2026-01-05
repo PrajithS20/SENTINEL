@@ -116,27 +116,7 @@ export default function Resources() {
             ))}
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 }}
-            className="text-center mt-12"
-          >
-            <div className="card p-8 max-w-2xl mx-auto">
-              <h3 className="text-2xl font-semibold mb-4">Need More Help?</h3>
-              <p className="text-gray-400 mb-6">
-                Can't find what you're looking for? Our career advisors are here to help you navigate your professional journey.
-              </p>
-              <div className="flex gap-4 justify-center">
-                <Link to="/career-chatbot" className="btn-primary">
-                  Chat with Advisor
-                </Link>
-                <Link to="/project-lab" className="btn-secondary">
-                  Explore Projects
-                </Link>
-              </div>
-            </div>
-          </motion.div>
+
         </div>
       </div>
     </motion.div>
