@@ -2,9 +2,6 @@
 
 **Sentinel** is an AI-Powered Career Acceleration Ecosystem designed to bridge the gap between learning and industry readiness. It uses a multi-agent AI system to assess skills, generate personalized portfolio projects, and verify work through simulated code reviews and vision analysis.
 
-![Career AI Screenshot](frontend/public/assets/forest_bg.png) 
-*(Note: Replace with actual screenshot path if available)*
-
 ## 🌟 Key Features
 
 ### 1. 🧠 AI Career Mentor
@@ -22,11 +19,15 @@
 *   **Smart Content**: Uses AI to convert your Sentinel Lab projects into professional "STAR" method bullet points.
 *   **Native PDF Export**: High-fidelity PDF export (using browser print) that supports multi-page resumes without breaking layout.
 
-### 4. 💼 Job Hub
+### 4. 🌏 Multilingual Support (New!)
+*   **Tamil Mode (தமிழ்)**: Toggle the entire AI persona to speak in Tamil (using Tamil script) mixed with English technical terms.
+*   **Cultural Context**: Designed to help rural students bridge the language gap without losing technical precision.
+
+### 5. 💼 Job Hub
 *   **Daily Scraper**: Automatically scrapes and caches fresh job listings from LinkedIn and Indeed every 24 hours.
 *   **Smart Match**: Filters jobs based on your current skill set and project portfolio.
 
-### 5. 👥 Collaborative Squad Mode
+### 6. 👥 Collaborative Squad Mode
 *   **Team Projects**: Join "Squads" to work on larger, complex projects.
 *   **Gamified Growth**: Watch your "Sprout" grow into a tree as you complete milestones.
 

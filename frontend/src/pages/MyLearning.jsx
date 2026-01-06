@@ -181,7 +181,7 @@ export default function MyLearning() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#050B12]">
+    <div className="flex flex-col min-h-screen bg-transparent">
       <TopBar />
 
       <div className="flex-1 p-6">
@@ -222,24 +222,22 @@ export default function MyLearning() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className={`relative p-6 rounded-xl border transition-all cursor-pointer group ${
-                    completedPhases.includes(phase.id)
+                  className={`relative p-6 rounded-xl border transition-all cursor-pointer group ${completedPhases.includes(phase.id)
                       ? "bg-green-500/10 border-green-500/50 hover:bg-green-500/20"
                       : phase.id <= Math.max(...completedPhases) + 1
-                      ? "bg-slate-700/30 border-slate-600/50 hover:border-cyan-500/50 hover:bg-cyan-500/5"
-                      : "bg-slate-800/30 border-slate-700/50 opacity-60 cursor-not-allowed"
-                  }`}
+                        ? "bg-slate-700/30 border-slate-600/50 hover:border-cyan-500/50 hover:bg-cyan-500/5"
+                        : "bg-slate-800/30 border-slate-700/50 opacity-60 cursor-not-allowed"
+                    }`}
                   onClick={() => handlePhaseClick(phase.id)}
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div
-                      className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                        completedPhases.includes(phase.id)
+                      className={`w-12 h-12 rounded-lg flex items-center justify-center ${completedPhases.includes(phase.id)
                           ? "bg-green-500/20"
                           : phase.id <= Math.max(...completedPhases) + 1
-                          ? "bg-cyan-500/20"
-                          : "bg-gray-500/20"
-                      }`}
+                            ? "bg-cyan-500/20"
+                            : "bg-gray-500/20"
+                        }`}
                     >
                       {completedPhases.includes(phase.id) ? (
                         <CheckCircle size={24} className="text-green-400" />
@@ -250,38 +248,35 @@ export default function MyLearning() {
                       )}
                     </div>
                     <span
-                      className={`text-sm font-medium px-3 py-1 rounded-full ${
-                        completedPhases.includes(phase.id)
+                      className={`text-sm font-medium px-3 py-1 rounded-full ${completedPhases.includes(phase.id)
                           ? "bg-green-500/20 text-green-400"
                           : phase.id <= Math.max(...completedPhases) + 1
-                          ? "bg-cyan-500/20 text-cyan-400"
-                          : "bg-gray-500/20 text-gray-400"
-                      }`}
+                            ? "bg-cyan-500/20 text-cyan-400"
+                            : "bg-gray-500/20 text-gray-400"
+                        }`}
                     >
                       Phase {phase.id}
                     </span>
                   </div>
 
                   <h3
-                    className={`text-xl font-semibold mb-3 ${
-                      completedPhases.includes(phase.id)
+                    className={`text-xl font-semibold mb-3 ${completedPhases.includes(phase.id)
                         ? "text-green-400"
                         : phase.id <= Math.max(...completedPhases) + 1
-                        ? "text-white group-hover:text-cyan-400"
-                        : "text-gray-500"
-                    }`}
+                          ? "text-white group-hover:text-cyan-400"
+                          : "text-gray-500"
+                      }`}
                   >
                     {phase.title}
                   </h3>
 
                   <p
-                    className={`text-sm mb-4 ${
-                      completedPhases.includes(phase.id)
+                    className={`text-sm mb-4 ${completedPhases.includes(phase.id)
                         ? "text-green-300"
                         : phase.id <= Math.max(...completedPhases) + 1
-                        ? "text-gray-400"
-                        : "text-gray-600"
-                    }`}
+                          ? "text-gray-400"
+                          : "text-gray-600"
+                      }`}
                   >
                     {phase.description}
                   </p>
@@ -293,20 +288,18 @@ export default function MyLearning() {
                     {phase.tasks.map((task, taskIndex) => (
                       <div key={taskIndex} className="flex items-center gap-2">
                         <div
-                          className={`w-2 h-2 rounded-full ${
-                            completedPhases.includes(phase.id)
+                          className={`w-2 h-2 rounded-full ${completedPhases.includes(phase.id)
                               ? "bg-green-400"
                               : "bg-gray-600"
-                          }`}
+                            }`}
                         />
                         <span
-                          className={`text-sm ${
-                            completedPhases.includes(phase.id)
+                          className={`text-sm ${completedPhases.includes(phase.id)
                               ? "text-green-300"
                               : phase.id <= Math.max(...completedPhases) + 1
-                              ? "text-gray-400"
-                              : "text-gray-600"
-                          }`}
+                                ? "text-gray-400"
+                                : "text-gray-600"
+                            }`}
                         >
                           {task}
                         </span>
@@ -334,9 +327,8 @@ export default function MyLearning() {
                   <div
                     className="bg-gradient-to-r from-cyan-500 to-blue-600 h-2 rounded-full transition-all duration-500"
                     style={{
-                      width: `${
-                        (completedPhases.length / project.phases.length) * 100
-                      }%`,
+                      width: `${(completedPhases.length / project.phases.length) * 100
+                        }%`,
                     }}
                   />
                 </div>

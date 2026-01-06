@@ -8,7 +8,10 @@ export default function LiveFeeds() {
   const [data, setData] = useState({ hot_jobs: [], hot_projects: [] });
 
   useEffect(() => {
-    fetch("http://localhost:8000/live-feeds")
+    const token = sessionStorage.getItem("authToken");
+    fetch("http://localhost:8000/live-feeds", {
+      headers: { Authorization: `Bearer ${token}` }
+    })
       .then((res) => res.json())
       .then((data) => setData(data))
       .catch((err) => console.error("Failed to fetch live feeds:", err));
@@ -20,7 +23,7 @@ export default function LiveFeeds() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="card h-full flex flex-col bg-black/40 backdrop-blur-md border border-green-500/20 shadow-xl"
+      className="h-full flex flex-col p-6 bg-black/20 backdrop-blur-sm border border-white/10 shadow-xl rounded-2xl"
     >
       <div className="flex items-center gap-2 mb-6">
         <TrendingUp className="text-green-400" size={20} />

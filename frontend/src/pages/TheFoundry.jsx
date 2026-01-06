@@ -36,6 +36,8 @@ export default function TheFoundry() {
     // --- RESIZING STATE ---
     const [leftWidth, setLeftWidth] = useState(30); // Percentage
     const [topHeight, setTopHeight] = useState(60); // Percentage
+    const [language, setLanguage] = useState("english"); // New State
+
     const containerRef = useRef(null);
     const rightPanelRef = useRef(null);
 
@@ -44,24 +46,21 @@ export default function TheFoundry() {
     const [remoteCode, setRemoteCode] = useState(null);
 
     // Sync Interval (Every 5s)
+    // Sync Interval (Every 5s) - DISABLED due to manual sync preference and server connection handling
+    /*
     useEffect(() => {
         if (!projectId) return;
         const interval = setInterval(async () => {
             try {
                 const res = await axios.get(`http://localhost:8000/project/${projectId}/sync`);
                 if (res.data.code && res.data.code !== code) {
-                    // Determine if we should overwrite?
-                    // For MVP, simplistic Last-Write-Wins, but we don't want to overwrite active typing.
-                    // We'll just update if we aren't typing?
-                    // Or maybe just show a notification?
-                    // Let's brute force valid sync for now:
-                    // Only update if difference is significant and we haven't typed recently?
-                    // Actually, let's just save.
+                    // Manual sync preferred
                 }
             } catch (e) { }
         }, 5000);
         return () => clearInterval(interval);
     }, [projectId, code]);
+    */
 
     const handleShare = async () => {
         if (sessionCode) {
@@ -182,7 +181,8 @@ export default function TheFoundry() {
                     title: project.title,
                     phase_title: activePhase?.title,
                     phase_description: activePhase?.description
-                }
+                },
+                language: language // Pass language state
             });
             setMessages(prev => [...prev, { role: "system", content: res.data.response }]);
         } catch (err) {
@@ -241,7 +241,7 @@ export default function TheFoundry() {
     if (!project || !activePhase) return <div className="text-white p-10 font-mono">INITIALIZING THE FOUNDRY...</div>;
 
     return (
-        <div ref={containerRef} className="flex h-screen max-h-screen w-full bg-[#050B12] text-gray-300 font-sans overflow-hidden select-none">
+        <div ref={containerRef} className="flex h-screen max-h-screen w-full bg-transparent text-gray-300 font-sans overflow-hidden select-none">
 
             {/* 1. LEFT PANEL - CHAT - Resizable */}
             <div
@@ -249,14 +249,23 @@ export default function TheFoundry() {
                 className="flex flex-col bg-[#070e18] shrink-0 z-10 h-full transition-none"
             >
                 <div className="p-4 border-b border-gray-800 flex items-center justify-between shrink-0 bg-[#070e18]">
-                    <button onClick={() => navigate("/my-lab")} className="text-gray-400 hover:text-white transition">
-                        <ArrowLeft size={20} />
-                    </button>
-                    <div className="flex items-center gap-2">
-                        <Cpu size={18} className="text-cyan-400" />
-                        <h2 className="text-white font-bold tracking-wider text-sm">THE ARCHITECT</h2>
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => navigate("/my-lab")} className="text-gray-400 hover:text-white transition">
+                            <ArrowLeft size={20} />
+                        </button>
+                        <h2 className="text-gray-100 font-semibold tracking-wide">The Architect</h2>
                     </div>
-                    <div className="w-5" />
+
+                    {/* Language Toggle */}
+                    <button
+                        onClick={() => setLanguage(l => l === "english" ? "tamil" : "english")}
+                        className={`text-xs px-2 py-1 rounded border transition-colors ${language === "tamil"
+                            ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/50"
+                            : "bg-blue-500/10 text-blue-400 border-blue-500/20 hover:border-blue-400"
+                            }`}
+                    >
+                        {language === "tamil" ? "தமிழ் (Tamil)" : "ENG (US)"}
+                    </button>
                 </div>
 
                 {/* Messages */}
@@ -344,7 +353,22 @@ export default function TheFoundry() {
                             onClick={handleShare}
                             className={`flex items-center gap-2 px-3 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all border ${sessionCode ? 'bg-cyan-900/30 border-cyan-500 text-cyan-400' : 'border-gray-700 text-gray-400 hover:text-white'}`}
                         >
-                            <Users size={12} /> {sessionCode ? sessionCode : "Share"}
+                            <Users size={12} /> {sessionCode ? sessionCode : "Share Session"}
+                        </button>
+                        <button
+                            onClick={async () => {
+                                try {
+                                    const res = await axios.get(`http://localhost:8000/project/${projectId}/sync`);
+                                    if (res.data.code) {
+                                        setCode(res.data.code);
+                                        // alert("Workspace Config Refreshed"); // Optional feedback
+                                    }
+                                } catch (e) { console.error("Sync failed"); }
+                            }}
+                            className="flex items-center gap-2 px-3 py-1 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
+                            title="Pull latest code from cloud"
+                        >
+                            <ArrowLeft size={10} className="rotate-180" /> Sync Cloud
                         </button>
                         <button
                             onClick={handleRunCode}
@@ -385,8 +409,8 @@ export default function TheFoundry() {
                 </div>
 
                 {/* BOTTOM: INFO PANEL */}
-                <div className="flex-1 bg-[#050B12] flex flex-col min-h-0 overflow-hidden">
-                    <div className="p-4 border-b border-gray-800 flex items-start justify-between shrink-0 bg-[#050B12]">
+                <div className="flex-1 bg-transparent flex flex-col min-h-0 overflow-hidden">
+                    <div className="p-4 border-b border-gray-800 flex items-start justify-between shrink-0 bg-transparent">
                         <div>
                             <h1 className="text-lg font-bold text-white mb-0.5 tracking-tight">{activePhase.title}</h1>
                             <p className="text-[10px] font-bold text-cyan-500 uppercase tracking-widest">PHASE {activePhase.id}</p>
@@ -435,12 +459,21 @@ export default function TheFoundry() {
                                     Resources
                                 </h4>
                                 <ul className="space-y-2 mb-6">
-                                    <li><a href="#" className="flex items-center gap-2 text-xs text-green-500 hover:text-white transition group">
-                                        <span className="opacity-50 group-hover:opacity-100">🔗</span> Official Documentation
-                                    </a></li>
-                                    <li><a href="#" className="flex items-center gap-2 text-xs text-green-500 hover:text-white transition group">
-                                        <span className="opacity-50 group-hover:opacity-100">🔗</span> StackOverflow
-                                    </a></li>
+                                    {activePhase.resources && activePhase.resources.length > 0 ? (
+                                        activePhase.resources.map((res, idx) => (
+                                            <li key={idx}>
+                                                <a href={res.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-green-500 hover:text-white transition group">
+                                                    <span className="opacity-50 group-hover:opacity-100">🔗</span> {res.label}
+                                                </a>
+                                            </li>
+                                        ))
+                                    ) : (
+                                        <li>
+                                            <a href={`https://www.google.com/search?q=${encodeURIComponent(activePhase.title + " tutorial")}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs text-green-500 hover:text-white transition group">
+                                                <span className="opacity-50 group-hover:opacity-100">🔍</span> Search: {activePhase.title}
+                                            </a>
+                                        </li>
+                                    )}
                                 </ul>
 
                                 <div className={`p-3 rounded border ${isApproved ? 'bg-green-900/10 border-green-500/30' : 'bg-[#0e1623] border-gray-800'}`}>

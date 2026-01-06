@@ -27,11 +27,76 @@ market = MarketAnalystAgent(mirror.client)
 foundry = FoundryAgent(mirror.client)
 resume_bot = ResumeAgent(mirror.client)
 
+# --- Auth Models & Logic ---
+import secrets
+import hashlib
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+class SignupRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return hash_password(plain_password) == hashed_password
+
+@app.post("/auth/signup")
+def signup(req: SignupRequest):
+    # Check if user exists
+    existing = database.get_user_by_email(req.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    pwd_hash = hash_password(req.password)
+    user_id = database.create_user(req.email, pwd_hash, req.name)
+    
+    if not user_id:
+         raise HTTPException(status_code=500, detail="Failed to create user")
+         
+    return {"message": "User created successfully", "user_id": user_id}
+
+@app.post("/login")
+def login(req: LoginRequest):
+    user = database.get_user_by_email(req.email)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+    if not verify_password(req.password, user['password_hash']):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+    # Generate Token
+    token = secrets.token_hex(32)
+    database.create_session(user['id'], token)
+    
+    return {"token": token, "name": user['full_name'], "email": user['email']}
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    user = database.get_user_by_token(token)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+# --- Foundry API Models & Endpoints ---
 # --- Foundry API Models & Endpoints ---
 class FoundryChatRequest(BaseModel):
     message: str
     code: str
     project_context: dict 
+    language: str = "english"
 
 class FoundryValidateRequest(BaseModel):
     code: str
@@ -39,7 +104,7 @@ class FoundryValidateRequest(BaseModel):
 
 @app.post("/foundry/chat")
 async def foundry_chat(req: FoundryChatRequest):
-    response = foundry.chat_architect(req.message, req.code, req.project_context)
+    response = foundry.chat_architect(req.message, req.code, req.project_context, req.language)
     return {"response": response}
 
 @app.post("/foundry/validate")
@@ -62,11 +127,63 @@ async def verify_output(file: UploadFile = File(...), phase_objective: str = For
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e), "approved": False})
 
+import io
+from pypdf import PdfReader
+
 @app.post("/analyze")
-async def process_career_cycle(file: UploadFile = File(...), target_role: str = Form(...)):
+def process_career_cycle(file: UploadFile = File(...), target_role: str = Form(...), user: dict = Depends(get_current_user)):
     try:
         # Read the file content
-        content = (await file.read()).decode('utf-8', errors='ignore')
+        file_bytes = file.file.read()
+        content = ""
+        
+        # Check for PDF signature or extension
+        if file.filename.lower().endswith(".pdf") or file.content_type == "application/pdf":
+            try:
+                # Parse PDF
+                pdf = PdfReader(io.BytesIO(file_bytes))
+                for page in pdf.pages:
+                    content += page.extract_text() + "\n"
+                
+                # Check for emptiness
+                # Check for emptiness BUT PROCEED ANYWAY (Some PDFs are images)
+                if not content.strip():
+                    print("Text extraction empty. Attempting Vision Extraction (Image-based PDF)...")
+                    try:
+                        # Extract images from first page
+                        page = pdf.pages[0]
+                        if len(page.images) > 0:
+                            # Convert first image to base64
+                            import base64
+                            img_obj = page.images[0]
+                            img_bytes = img_obj.data
+                            base64_img = base64.b64encode(img_bytes).decode('utf-8')
+                            
+                            # Call Vision Agent
+                            profile_data = mirror.analyze_image_resume(base64_img, target_role)
+                            
+                            # Skip normal text flow
+                            skill_gaps = profile_data.get("skill_gaps", [])
+                            projects = lab.generate_projects(skill_gaps)
+                            database.save_career_data(target_role, profile_data, projects, "Sprout", user['id'])
+                            return {"profile": profile_data, "projects": projects}
+                            
+                        else:
+                            content = "[WARNING: EMPTY PDF AND NO IMAGES FOUND]"
+                    except Exception as vision_err:
+                        print(f"Vision Extraction Failed: {vision_err}")
+                        content = "[WARNING: FAILED TO EXTRACT IMAGES]"
+                        
+                else:
+                    # Tag it so agent knows context
+                    content = f"[RESUME PDF CONTENT START]\n{content}\n[RESUME PDF CONTENT END]"
+            except Exception as pdf_err:
+                print(f"PDF Parsing Failed: {pdf_err}")
+                # Don't fail, just pass through (might be text file with pdf extension)
+                content = file_bytes.decode('utf-8', errors='ignore')
+        else:
+            # Fallback to Text
+            content = file_bytes.decode('utf-8', errors='ignore')
         
         # 1. Mirror Agent call (Returns profile dictionary)
         profile_data = mirror.analyze_resume(content, target_role)
@@ -75,8 +192,8 @@ async def process_career_cycle(file: UploadFile = File(...), target_role: str = 
         skill_gaps = profile_data.get("skill_gaps", [])
         projects = lab.generate_projects(skill_gaps)
         
-        # 3. FIX: Match the function name and add 'stage' argument
-        database.save_career_data(target_role, profile_data, projects, "Sprout")
+        # 3. Save to History (User specific)
+        database.save_career_data(target_role, profile_data, projects, "Sprout", user['id'])
         
         return {"profile": profile_data, "projects": projects}
     except Exception as e:
@@ -97,15 +214,15 @@ async def update_generated_projects(req: UpdateProjectsRequest):
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 @app.get("/market-match")
-async def get_market_matching():
+def get_market_matching(user: dict = Depends(get_current_user)):
     # Frontend calls this on refresh to restore the dashboard
-    history = database.get_latest_profile()
+    history = database.get_profile_by_user_id(user['id'])
     if not history:
         return {"error": "No profile found"}
     
     return {
         "profile": history['analysis'], 
-        "projects": history['projects'], # database.py handles the json.loads
+        "projects": history['projects'], 
         "role": history['role'],
         "stage": history['growth_stage']
     }
@@ -117,29 +234,39 @@ class ChatRequest(BaseModel):
     session_id: str
 
 @app.get("/chat/sessions")
-async def get_chat_sessions():
-    return database.get_all_chat_sessions()
+def get_chat_sessions(user: dict = Depends(get_current_user)):
+    return database.get_all_chat_sessions(user['id'])
 
 @app.post("/chat/new")
-async def create_new_chat():
+def create_new_chat(user: dict = Depends(get_current_user)):
     session_id = f"chat_{int(time.time())}"
-    database.create_chat_session(session_id, "New Chat")
+    database.create_chat_session(session_id, user['id'], "New Chat")
     return {"session_id": session_id, "title": "New Chat"}
 
 @app.get("/chat/history/{session_id}")
-async def get_history_by_session(session_id: str):
+def get_history_by_session(session_id: str, user: dict = Depends(get_current_user)):
+    # Optional: Verify user owns session? For now just fetch messages.
     history = database.get_chat_history(session_id)
     return {"messages": history}
 
+@app.delete("/chat/sessions/{session_id}")
+async def delete_chat_session(session_id: str, user: dict = Depends(get_current_user)):
+    try:
+        database.delete_chat_session(session_id)
+        return {"status": "deleted"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
 @app.post("/chat")
-async def career_chat(req: ChatRequest):
-    history = database.get_latest_profile()
+def career_chat(req: ChatRequest, user: dict = Depends(get_current_user)):
+    history = database.get_profile_by_user_id(user['id'])
     if not history:
         return {"response": "Please upload a resume first."}
         
     # Check if session exists, if not create (auto-recovery)
-    if not database.get_chat_history(req.session_id) and len(database.get_chat_history(req.session_id)) == 0:
-        database.create_chat_session(req.session_id, f"Chat about {req.message[:20]}...")
+    # Note: get_chat_history returns messages, not session meta. 
+    # But create_chat_session is safe (INSERT OR IGNORE)
+    database.create_chat_session(req.session_id, user['id'], f"Chat about {req.message[:20]}...")
 
     # Load Past Context
     past_msgs = database.get_chat_history(req.session_id)
@@ -152,11 +279,11 @@ async def career_chat(req: ChatRequest):
         f"User is a {history['role']} with skills: {history['analysis'].get('current_skills', 'N/A')}. "
         "INSTRUCTIONS: Respond in max 3 short paragraphs. Use bullet points. Keep it neat. \n\n"
         "IMPORTANT PROJECT GENERATION RULES:\n"
-        "1. ONLY generate a JSON block if the user EXPLICITLY asks to 'create', 'generate', 'give', 'change', or 'update' projects.\n"
-        "2. Do NOT generate JSON for general questions like 'what are my skills' or 'explain python'.\n"
-        "3. If the user asks for specific difficulty levels (e.g., 'give me medium projects'), ONLY generate projects for that level.\n"
-        "4. If the user asks for projects by TOPIC but DOES NOT specify a level (e.g., 'give me python projects'), generate valid projects for ALL THREE LEVELS (3 Easy, 3 Medium, 3 Hard) to complete the set.\n"
-        "5. Format: Append a single JSON block at the end: ```json { \"projects\": [ { \"id\": \"unique-id\", \"title\": \"Title\", \"description\": \"Desc\", \"tech\": [\"Tag\"], \"difficulty\": \"Easy/Medium/Hard\", \"icon\": \"code\", \"color\": \"from-blue-500 to-cyan-500\" } ] } ```. ensure 'id' and 'difficulty' are PRESENT."
+        "1. DEFAULT BEHAVIOR: Output ONLY text. Do NOT generate new projects unless the user explicitly asks to 'create', 'generate', 'give', 'change', or 'update' projects.\n"
+        "2. If the user just says 'hello' or asks a question, ANSWER ONLY IN TEXT. Do not append JSON.\n"
+        "3. ONLY if the user explicitly asks for new projects: Append a single JSON block at the end: ```json { \"projects\": [ { \"id\": \"unique-id\", \"title\": \"Title\", \"description\": \"Desc\", \"tech\": [\"Tag\"], \"difficulty\": \"Easy/Medium/Hard\", \"icon\": \"code\", \"color\": \"from-blue-500 to-cyan-500\" } ] } ```.\n"
+        "4. If the user asks for specific difficulty levels (e.g., 'give me medium projects'), ONLY generate projects for that level.\n"
+        "5. If the user asks for projects by TOPIC but DOES NOT specify a level (e.g., 'give me python projects'), generate valid projects for ALL THREE LEVELS (3 Easy, 3 Medium, 3 Hard) to complete the set."
     )
     
     try:
@@ -223,8 +350,8 @@ async def build_resume(req: ResumeBuildRequest):
 # --- New Endpoints for Frontend Alignment ---
 
 @app.get("/live-feeds")
-async def get_live_feeds():
-    profile = database.get_latest_profile()
+def get_live_feeds(user: dict = Depends(get_current_user)):
+    profile = database.get_profile_by_user_id(user['id'])
     if profile:
         skills = profile['analysis'].get('current_skills', [])
         return market.get_live_feeds(profile['role'], skills)
@@ -232,9 +359,13 @@ async def get_live_feeds():
     # Fallback if no profile
     return market.get_live_feeds(None, None)
 
+@app.get("/market/ticker")
+def get_market_ticker():
+    return market.get_stock_ticker()
+
 @app.get("/job-matches")
-async def get_job_matches():
-    profile = database.get_latest_profile()
+def get_job_matches(user: dict = Depends(get_current_user)):
+    profile = database.get_profile_by_user_id(user['id'])
     if not profile:
         return {"jobs": []}
     
@@ -284,10 +415,10 @@ class UpdatePhaseRequest(BaseModel):
     phase_id: int # The phase just completed
 
 @app.post("/project/start")
-async def start_project(req: StartProjectRequest):
+def start_project(req: StartProjectRequest, user: dict = Depends(get_current_user)):
     # Check if already active
-    # Note: We now check global projects
-    active_projects = database.get_all_active_projects()
+    # CHECK USER PROJECTS ONLY
+    active_projects = database.get_all_active_projects(user['id'])
     for p in active_projects:
         if p['title'] == req.title:
             return {"project": p, "status": "job_already_started"}
@@ -306,13 +437,13 @@ async def start_project(req: StartProjectRequest):
         "started_at": datetime.now().isoformat()
     }
     
-    database.save_project_globally(new_project)
+    database.save_project_globally(new_project, user['id'])
     
     return {"project": new_project, "status": "started"}
 
 @app.get("/workspace")
-async def get_workspace():
-    projects = database.get_all_active_projects()
+async def get_workspace(user: dict = Depends(get_current_user)):
+    projects = database.get_all_active_projects(user['id'])
     return {"projects": projects}
 
 @app.get("/project/{project_id}")
@@ -334,7 +465,12 @@ async def unlock_phase(req: UpdatePhaseRequest):
             
         if p['current_phase'] == req.phase_id:
              database.update_phase_progress(req.project_id, req.phase_id + 1)
-             return {"status": "updated"}
+             
+             # Dynamic Growth Update
+             new_stage = database.recalculate_user_growth(None)
+             print(f"User Growth Updated: {new_stage}")
+             
+             return {"status": "updated", "new_stage": new_stage}
              
         return {"status": "no_change"}
     except Exception as e:
@@ -393,23 +529,213 @@ async def get_latest_code(project_id: str):
     return {"code": p.get('code', "")}
 
 
-class LoginRequest(BaseModel):
-    email: str
-    password: str
 
-@app.post("/login")
-async def login(creds: LoginRequest):
-    return {"token": "demo-token-123", "user": {"name": "Cadet X", "email": creds.email}}
 
 @app.get("/growth-status")
-async def get_growth_status():
-    profile = database.get_latest_profile()
-    if profile:
-        stages = {"Seed": 15, "Sprout": 35, "Sapling": 55, "Young Tree": 75, "Mature Tree": 95}
-        prog = stages.get(profile['growth_stage'], 15)
-        return {"progress": prog, "stage": profile['growth_stage']}
+def get_growth_status(user: dict = Depends(get_current_user)):
+    profile = database.get_profile_by_user_id(user['id'])
     
-    return {"progress": 15, "stage": "Seed"}
+    # Calculate Tree Count on the fly for UI (User Specific)
+    trees_count = database.get_user_tree_stats(user['id'])
+
+    if not profile:
+         return {"stage": "Seed", "trees": trees_count, "progress": 0, "next_stage": "Sprout"}
+    
+    # Define Tiers
+    tiers = [
+        {"name": "Sprout", "min": 0, "max": 4},
+        {"name": "Grove Guardian", "min": 5, "max": 14},
+        {"name": "Forest Ranger", "min": 15, "max": 29},
+        {"name": "Terraformer", "min": 30, "max": 49},
+        {"name": "Gaia's Legacy", "min": 50, "max": 999}
+    ]
+    
+    current_tier = next((t for t in tiers if t['name'] == profile['growth_stage']), tiers[0])
+    next_tier = next((t for t in tiers if t['min'] > current_tier['max']), None)
+    
+    progress = 0
+    if next_tier:
+        total_needed = next_tier['min']
+        progress = int((trees_count / total_needed) * 100)
+    else:
+        progress = 100
+        
+    return {
+        "stage": profile['growth_stage'],
+        "trees": trees_count,
+        "progress": progress,
+        "next_stage": next_tier['name'] if next_tier else "Max Level"
+    }
+
+# --- PROFILE API ---
+class ProfileUpdateRequest(BaseModel):
+    full_name: str
+    bio: str
+    location: str
+    email: str
+    avatar: str | None = None
+
+class GoalRequest(BaseModel):
+    text: str
+    tag: str
+    color: str
+    is_done: bool = False
+
+class GoalStatusRequest(BaseModel):
+    is_done: bool
+
+class ActivityRequest(BaseModel):
+    date: str # YYYY-MM-DD
+    hours: float
+    level: int
+
+@app.get("/profile")
+def get_profile_full(user: dict = Depends(get_current_user)):
+    p = database.get_profile_by_user_id(user['id'])
+    if not p:
+        # If no specific profile, try latest global? No, return empty or new behavior
+        # But for transition, maybe return empty with user info
+        return {
+            "id": 0, 
+            "role": "New User", 
+            "full_name": user['full_name'], 
+            "email": user['email'],
+            "avatar": None, 
+            "analysis": {"current_skills": []},
+            "projects": [],
+            "growth_stage": "Seed",
+            "goals": [],
+            "activity": [],
+            "stats": [{"label": "Active Projects", "value": 0}, {"label": "Trees Grown", "value": 0}]
+        }
+    
+    # Enrich with Goals and Activity
+    goals = database.get_user_goals(p['id'])
+    activity = database.get_user_activity(p['id'])
+
+    # Real-time stats
+    active_projects = database.get_all_active_projects(user['id'])
+    
+    # Calculate trees
+    trees_planted = database.get_user_tree_stats(user['id'])
+    
+    # Add stats
+    return {
+        **p,
+        "full_name": user['full_name'], # Use Account Name
+        "email": user['email'],         # Use Account Email
+        "goals": goals,
+        "activity": activity,
+        "active_projects_count": len(active_projects),
+        "trees_planted": trees_planted
+    }
+
+@app.post("/profile/update")
+async def update_profile(req: ProfileUpdateRequest):
+    p = database.get_latest_profile()
+    if not p: raise HTTPException(status_code=404)
+    
+    database.update_profile_details(p['id'], req.dict())
+    return {"status": "updated"}
+
+@app.post("/profile/goals")
+async def add_goal(req: GoalRequest):
+    p = database.get_latest_profile()
+    if not p: raise HTTPException(status_code=404)
+    
+    database.add_user_goal(p['id'], req.dict())
+    return {"status": "added"}
+
+@app.delete("/profile/goals/{goal_id}")
+async def delete_goal(goal_id: int):
+    database.delete_goal(goal_id)
+    return {"status": "deleted"}
+
+@app.put("/profile/goals/{goal_id}")
+async def update_goal(goal_id: int, req: GoalStatusRequest):
+    database.update_goal_status(goal_id, req.is_done)
+    return {"status": "updated"}
+
+@app.post("/profile/activity")
+async def log_activity(req: ActivityRequest):
+    p = database.get_latest_profile()
+    if not p: raise HTTPException(status_code=404)
+    
+    database.log_user_activity(p['id'], req.date, req.hours, req.level)
+    return {"status": "logged"}
+    # Cap progress to the next tier
+    tiers = [
+        ("Sprout", 5),
+        ("Grove Guardian", 15),
+        ("Forest Ranger", 30),
+        ("Terraformer", 50),
+        ("Gaia's Legacy", 1000)
+    ]
+    
+    current_tier_max = 5
+    for tier_name, limit in tiers:
+        if trees_count < limit:
+            current_tier_max = limit
+            break
+            
+    # Calculate percentage to next badge
+    # e.g. 2 trees. Target 5. Progress = 40%
+    # e.g. 12 trees. Target 15. Progress = 80% (relative to total? or just raw scale?)
+    # Let's do raw scale relative to next badge
+    if current_tier_max > 0:
+        progress = min(100, int((trees_count / current_tier_max) * 100))
+    else:
+        progress = 100
+    
+    stage = profile['growth_stage'] if profile else "Sprout"
+    
+    return {
+        "progress": progress, 
+        "stage": stage, 
+        "trees": trees_count, 
+        "next_goal": current_tier_max
+    }
+
+# --- Community Chat Endpoints ---
+
+class ChatMessageRequest(BaseModel):
+    channel: str
+    content: str
+    type: str = "text" # text, code, file
+
+@app.get("/community/channels")
+def list_channels(auth_user=Depends(get_current_user)):
+    return database.get_channels()
+
+@app.get("/community/messages/{channel_name}")
+def get_messages(channel_name: str, auth_user=Depends(get_current_user)):
+    return database.get_channel_messages(channel_name)
+
+@app.post("/community/messages")
+def post_message(req: ChatMessageRequest, auth_user=Depends(get_current_user)):
+    success = database.add_community_message(auth_user['id'], req.channel, req.content, req.type)
+    if not success:
+        raise HTTPException(status_code=400, detail="Invalid channel")
+    return {"status": "sent"}
+
+# --- End Community Chat Endpoints ---
+
+@app.on_event("shutdown")
+def shutdown_event():
+    import os
+    print("Forcefully shutting down...")
+    os._exit(0)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import signal
+    import sys
+
+    def signal_handler(sig, frame):
+        print("\nCtrl+C detected! Exiting immediately...")
+        import os
+        os._exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    
+    # Force asyncio loop for better Windows compatibility and reduce keep-alive timeout
+    uvicorn.run(app, host="0.0.0.0", port=8000, loop="asyncio", timeout_keep_alive=2)

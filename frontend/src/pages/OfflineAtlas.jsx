@@ -1,12 +1,15 @@
+// OfflineAtlas.jsx
 import { motion } from "framer-motion";
 import { Download, BookOpen, Code, Database, Globe, Smartphone, Cpu, FileText, Video, Headphones } from "lucide-react";
 import TopBar from "../components/TopBar";
+import { ParticleCard } from "../components/MagicBento";
 
 const offlineResources = [
   {
     category: "Programming Fundamentals",
     icon: Code,
     color: "from-blue-500 to-cyan-600",
+    glow: "6, 182, 212", // Cyan
     resources: [
       {
         title: "Python Complete Course",
@@ -38,6 +41,7 @@ const offlineResources = [
     category: "Web Development",
     icon: Globe,
     color: "from-green-500 to-emerald-600",
+    glow: "16, 185, 129", // Emerald
     resources: [
       {
         title: "React Masterclass",
@@ -69,6 +73,7 @@ const offlineResources = [
     category: "Data Science & AI",
     icon: Cpu,
     color: "from-purple-500 to-pink-600",
+    glow: "236, 72, 153", // Pink
     resources: [
       {
         title: "Machine Learning Fundamentals",
@@ -100,6 +105,7 @@ const offlineResources = [
     category: "Mobile Development",
     icon: Smartphone,
     color: "from-orange-500 to-red-600",
+    glow: "249, 115, 22", // Orange
     resources: [
       {
         title: "React Native Complete Guide",
@@ -123,6 +129,7 @@ const offlineResources = [
     category: "Databases & DevOps",
     icon: Database,
     color: "from-indigo-500 to-purple-600",
+    glow: "139, 92, 246", // Violet
     resources: [
       {
         title: "MongoDB Complete Course",
@@ -152,9 +159,17 @@ const offlineResources = [
   }
 ];
 
+const borderMap = [
+  "hover:border-cyan-500/50",
+  "hover:border-emerald-500/50",
+  "hover:border-pink-500/50",
+  "hover:border-orange-500/50",
+  "hover:border-violet-500/50"
+];
+
 export default function OfflineAtlas() {
   return (
-    <div className="flex flex-col min-h-screen bg-[#050B12]">
+    <div className="flex flex-col min-h-screen bg-transparent">
       <TopBar />
 
       <div className="flex-1 p-6">
@@ -212,32 +227,25 @@ export default function OfflineAtlas() {
 
           {/* Resource Categories */}
           <div className="space-y-8">
-            {offlineResources.map((category, categoryIndex) => (
-              <motion.div
-                key={category.category}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: categoryIndex * 0.1 }}
-                className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50"
-              >
-                <div className="flex items-center gap-3 mb-6">
-                  <div className={`w-10 h-10 rounded-lg bg-gradient-to-r ${category.color} flex items-center justify-center`}>
-                    <category.icon size={20} className="text-white" />
-                  </div>
-                  <h2 className="text-xl font-bold text-white">{category.category}</h2>
+            {offlineResources.map((category, categoryIndex) => <div className="bg-slate-900/40 backdrop-blur-sm rounded-2xl p-6 border border-white/5">
+              <div className="flex items-center gap-3 mb-6">
+                <div className={`w-10 h-10 rounded-lg bg-gradient-to-r ${category.color} flex items-center justify-center shadow-lg shadow-${category.color.split(' ')[1]}/20`}>
+                  <category.icon size={20} className="text-white" />
                 </div>
+                <h2 className="text-xl font-bold text-white">{category.category}</h2>
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {category.resources.map((resource, resourceIndex) => (
-                    <motion.div
-                      key={resource.title}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: (categoryIndex * 0.1) + (resourceIndex * 0.05) }}
-                      className="bg-gradient-to-br from-slate-700/30 to-slate-800/30 rounded-lg p-4 border border-slate-600/30 hover:border-cyan-500/50 transition-all duration-300 group cursor-pointer"
-                    >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {category.resources.map((resource, resourceIndex) => (
+                  <ParticleCard
+                    key={resource.title}
+                    className={`bg-white/5 hover:bg-white/10 rounded-xl p-4 border border-white/5 ${borderMap[categoryIndex]} transition-all duration-300 group cursor-pointer relative flex flex-col justify-between`}
+                    glowColor={category.glow}
+                    clickEffect={true}
+                  >
+                    <div className="relative z-[101]">
                       <div className="flex items-start justify-between mb-3">
-                        <div className={`w-8 h-8 rounded-md bg-gradient-to-r ${category.color} flex items-center justify-center flex-shrink-0`}>
+                        <div className={`w-8 h-8 rounded-md bg-gradient-to-r ${category.color} flex items-center justify-center flex-shrink-0 opacity-80 group-hover:opacity-100 transition-opacity`}>
                           {resource.type === 'Video' && <Video size={14} className="text-white" />}
                           {resource.type === 'PDF Guide' && <FileText size={14} className="text-white" />}
                           {resource.type === 'Interactive' && <Code size={14} className="text-white" />}
@@ -260,15 +268,16 @@ export default function OfflineAtlas() {
 
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-500">{resource.duration}</span>
-                        <button className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-3 py-1 rounded text-xs font-medium hover:from-cyan-400 hover:to-blue-500 transition-all duration-300 transform hover:scale-105">
+                        <button className={`bg-gradient-to-r ${category.color} text-white px-3 py-1 rounded text-xs font-medium opacity-90 hover:opacity-100 transition-all duration-300 transform hover:scale-105 shadow-lg`}>
                           Download
                         </button>
                       </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </motion.div>
-            ))}
+                    </div>
+                  </ParticleCard>
+                ))}
+              </div>
+            </div>
+            )}
           </div>
         </div>
       </div>

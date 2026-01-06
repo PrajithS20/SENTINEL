@@ -1,126 +1,120 @@
 // ServicesList.jsx
-import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   Upload,
   MessageCircle,
   BookOpen,
   Users,
-  Award,
   TrendingUp,
   Briefcase,
-  Map
+  Map,
+  ArrowRight
 } from "lucide-react";
+import { motion } from "framer-motion";
+import { ParticleCard } from "./MagicBento";
 
 const services = [
   {
     title: "Resume Upload & Analysis",
-    description: "Upload your resume for AI-powered analysis and optimization suggestions",
+    description: "Upload your resume for analysis",
     icon: Upload,
     path: "/upload-resume",
-    color: "from-cyan-500 to-blue-600",
-    bgColor: "from-cyan-500/10 to-blue-500/10",
-    hoverColor: "hover:shadow-cyan-500/20"
-  },
-  {
-    title: "Career Chatbot",
-    description: "Get personalized career advice from our AI assistant",
-    icon: MessageCircle,
-    path: "/career-chatbot",
-    color: "from-purple-500 to-pink-600",
-    bgColor: "from-purple-500/10 to-pink-500/10",
-    hoverColor: "hover:shadow-purple-500/20"
+    headerLabel: "ANALYSIS"
   },
   {
     title: "Learning Resources",
-    description: "Access comprehensive guides, tutorials, and templates",
+    description: "Access guides and tutorials",
     icon: BookOpen,
     path: "/resources",
-    color: "from-green-500 to-emerald-600",
-    bgColor: "from-green-500/10 to-emerald-500/10",
-    hoverColor: "hover:shadow-green-500/20"
+    headerLabel: "EDUCATION"
   },
   {
     title: "Project Lab",
-    description: "Explore hands-on projects and development tools",
+    description: "Explore hands-on projects",
     icon: TrendingUp,
     path: "/project-lab",
-    color: "from-orange-500 to-red-600",
-    bgColor: "from-orange-500/10 to-red-500/10",
-    hoverColor: "hover:shadow-orange-500/20"
+    headerLabel: "PROJECTS"
+  },
+  {
+    title: "My Lab",
+    description: "Manage your active projects",
+    icon: TrendingUp, // Should import Monitor or similar if available, or keep generic for now
+    path: "/my-lab",
+    headerLabel: "WORKSPACE"
   },
   {
     title: "Job Hub",
-    description: "Find job opportunities and career connections",
+    description: "Find job opportunities",
     icon: Briefcase,
     path: "/job-hub",
-    color: "from-indigo-500 to-purple-600",
-    bgColor: "from-indigo-500/10 to-purple-500/10",
-    hoverColor: "hover:shadow-indigo-500/20"
+    headerLabel: "JOBS"
   },
   {
     title: "Offline Atlas",
-    description: "Navigate your career path with our offline resources",
+    description: "Navigate your career path offline",
     icon: Map,
     path: "/offline-atlas",
-    color: "from-teal-500 to-cyan-600",
-    bgColor: "from-teal-500/10 to-cyan-500/10",
-    hoverColor: "hover:shadow-teal-500/20"
+    headerLabel: "OFFLINE"
   },
   {
     title: "Community Network",
-    description: "Connect with mentors and fellow professionals",
-    icon: Users,
+    description: "Join the community chat",
+    icon: MessageCircle, // Changed to MessageCircle or similar
     path: "/community",
-    color: "from-rose-500 to-pink-600",
-    bgColor: "from-rose-500/10 to-pink-500/10",
-    hoverColor: "hover:shadow-rose-500/20"
+    headerLabel: "COMMUNITY"
   },
   {
-    title: "Skill Certifications",
-    description: "Earn recognized certifications for your skills",
-    icon: Award,
-    path: "/certifications",
-    color: "from-amber-500 to-orange-600",
-    bgColor: "from-amber-500/10 to-orange-500/10",
-    hoverColor: "hover:shadow-amber-500/20"
+    title: "Collaborate",
+    description: "Work with others in real-time",
+    icon: Users,
+    path: "/collaborate",
+    headerLabel: "COLLABORATION"
   }
 ];
 
 export default function ServicesList() {
+  const navigate = useNavigate();
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
       {services.map((service, index) => (
         <motion.div
           key={service.title}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: index * 0.1 }}
-          whileHover={{ scale: 1.05 }}
-          className="group"
+          className="h-full"
         >
-          <Link to={service.path} className="block">
-            <div className={`card p-6 h-full bg-gradient-to-br ${service.bgColor} border border-white/10 backdrop-blur-sm hover:shadow-glow ${service.hoverColor} transition-all duration-300 hover:border-white/20`}>
-              <div className={`w-12 h-12 rounded-lg bg-gradient-to-r ${service.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg`}>
-                <service.icon size={24} className="text-white" />
-              </div>
-
-              <h3 className="text-lg font-semibold mb-2 group-hover:text-white transition-colors">
-                {service.title}
-              </h3>
-
-              <p className="text-gray-300 text-sm leading-relaxed">
-                {service.description}
-              </p>
-
-              <div className="mt-4 flex items-center text-cyan-400 text-sm font-medium group-hover:translate-x-1 transition-transform">
-                Explore
-                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
+          <ParticleCard
+            onClick={() => navigate(service.path)}
+            className="group relative bg-[#030712] border border-white/5 hover:border-purple-500/50 rounded-3xl p-8 transition-all duration-300 hover:shadow-[0_0_30px_-5px_rgba(168,85,247,0.15)] overflow-hidden cursor-pointer flex flex-col items-start min-h-[280px] h-full"
+            glowColor="168, 85, 247"
+          >
+            {/* Icon */}
+            <div className="p-3 bg-white/5 rounded-2xl mb-6 group-hover:bg-purple-500/20 group-hover:scale-110 transition-all duration-300 relative z-10">
+              <service.icon size={24} className="text-gray-300 group-hover:text-purple-400" />
             </div>
-          </Link>
+
+            {/* Header Label */}
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 relative z-10">
+              {service.headerLabel}
+            </div>
+
+            {/* Title */}
+            <h3 className="text-xl font-bold text-white mb-3 group-hover:text-purple-100 transition-colors relative z-10">
+              {service.title}
+            </h3>
+
+            {/* Description */}
+            <p className="text-gray-400 text-sm mb-8 leading-relaxed line-clamp-2 relative z-10">
+              {service.description}
+            </p>
+
+            {/* Link */}
+            <div className="mt-auto flex items-center text-purple-400 text-sm font-bold tracking-wide relative z-10">
+              Explore <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </ParticleCard>
         </motion.div>
       ))}
     </div>

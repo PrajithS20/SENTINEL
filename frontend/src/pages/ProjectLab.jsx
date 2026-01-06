@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Lightbulb, Code, Database, Globe, Smartphone, Cpu } from "lucide-react";
 import axios from "axios";
 import { useProgressStore } from "../store/useProgressStore";
+import { ParticleCard } from "../components/MagicBento";
 
 const iconMap = {
   lightbulb: Lightbulb,
@@ -21,7 +22,10 @@ export default function ProjectLab() {
   useEffect(() => {
     // Fetch if empty
     if (generatedProjects.length === 0) {
-      fetch("http://localhost:8000/market-match")
+      const token = sessionStorage.getItem("authToken");
+      fetch("http://localhost:8000/market-match", {
+        headers: { Authorization: `Bearer ${token}` }
+      })
         .then((res) => res.json())
         .then((data) => {
           if (data.projects) setProjects(data.projects);
@@ -32,39 +36,45 @@ export default function ProjectLab() {
 
   const handleStartProject = async (project) => {
     try {
+      const token = sessionStorage.getItem("authToken");
       const response = await axios.post("http://localhost:8000/project/start", {
         title: project.title,
         tech_stack: project.tech ? project.tech.join(", ") : "React, Node.js",
         description: project.description
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
       const newProject = response.data.project;
       addActiveProject(newProject);
       navigate(`/project/${newProject.id}`);
     } catch (err) {
       console.error("Failed to start project:", err);
-      alert("Error starting project.");
+      // alert("Error starting project."); // removed alert to be cleaner or handle 401
+      if (err.response && err.response.status === 401) alert("Please log in to start a project.");
     }
   };
 
   const ProjectCard = ({ project }) => {
     const IconComponent = iconMap[project.icon] || Lightbulb;
     return (
-      <motion.div
-        whileHover={{ scale: 1.02 }}
-        className="bg-gray-800/50 border border-gray-700/50 p-5 rounded-xl hover:border-neon/50 cursor-pointer transition-all"
+      <ParticleCard
+        className="bg-gray-800/50 border border-gray-700/50 p-5 rounded-xl hover:border-cyan-500/50 cursor-pointer transition-all min-h-[200px] flex flex-col justify-between"
         onClick={() => handleStartProject(project)}
+        glowColor="6, 182, 212"
       >
-        <div className={`w-10 h-10 rounded-lg bg-gradient-to-r ${project.color || 'from-gray-500 to-gray-600'} flex items-center justify-center mb-4`}>
-          <IconComponent size={20} className="text-white" />
+        <div>
+          <div className={`w-10 h-10 rounded-lg bg-gradient-to-r ${project.color || 'from-gray-500 to-gray-600'} flex items-center justify-center mb-4 relative z-[101]`}>
+            <IconComponent size={20} className="text-white" />
+          </div>
+          <h3 className="font-bold text-lg text-white mb-2 line-clamp-1 relative z-[101]">{project.title}</h3>
+          <p className="text-sm text-gray-400 mb-4 line-clamp-2 relative z-[101]">{project.description}</p>
         </div>
-        <h3 className="font-bold text-lg text-white mb-2 line-clamp-1">{project.title}</h3>
-        <p className="text-sm text-gray-400 mb-4 line-clamp-2">{project.description}</p>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 relative z-[101]">
           {project.tech?.slice(0, 3).map(t => (
-            <span key={t} className="text-xs bg-gray-900 px-2 py-1 rounded text-gray-300">{t}</span>
+            <span key={t} className="text-xs bg-gray-900 px-2 py-1 rounded text-gray-300 border border-gray-700">{t}</span>
           ))}
         </div>
-      </motion.div>
+      </ParticleCard>
     );
   };
 
@@ -77,7 +87,7 @@ export default function ProjectLab() {
   const hardProjects = validProjects.filter(p => p.difficulty && (p.difficulty.toLowerCase().includes("hard") || p.difficulty.toLowerCase().includes("tough") || p.difficulty.toLowerCase().includes("advanced")));
 
   return (
-    <div className="min-h-screen bg-[#050B12] p-6 text-gray-200">
+    <div className="min-h-screen bg-transparent p-6 text-gray-200">
       <Link to="/" className="flex items-center gap-2 text-neon hover:text-neon/80 mb-8 w-fit">
         <ArrowLeft size={20} /> Back to Dashboard
       </Link>

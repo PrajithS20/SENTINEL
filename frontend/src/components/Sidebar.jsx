@@ -2,7 +2,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useProgressStore } from "../store/useProgressStore";
 import {
-  LayoutDashboard,
+  Home, // Changed from LayoutDashboard
   FlaskConical,
   Map,
   Briefcase,
@@ -13,16 +13,22 @@ import {
   LogOut,
   Code,
   GraduationCap,
-  Users, // Added Users here
+  Users,
+  Sparkles,
+  MessageSquare,
+  Rocket, // New for Project Lab
+  Monitor, // New for My Lab
 } from "lucide-react";
+import Galaxy from "./Galaxy";
 
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+  { label: "Home", icon: Home, path: "/" }, // Changed from Dashboard
   { label: "Career Guidance", icon: FlaskConical, path: "/career-guidance" },
-  { label: "Project Lab", icon: Code, path: "/project-lab" }, // Swapped icons logically? No, stick to original but move.
-  { label: "My Lab", icon: Code, path: "/my-lab" },
+  { label: "Project Lab", icon: Rocket, path: "/project-lab" }, // Changed icon
+  { label: "Community", icon: MessageSquare, path: "/community" },
+  { label: "My Lab", icon: Monitor, path: "/my-lab" }, // Changed icon
   { label: "Collaborate", icon: Users, path: "/collaborate" },
-  { label: "Resources", icon: BookOpen, path: "/resources" },
+
   { label: "Offline Atlas", icon: Map, path: "/offline-atlas" },
   { label: "Job Hub", icon: Briefcase, path: "/job-hub" },
 ];
@@ -64,32 +70,32 @@ export default function Sidebar({ onLogout }) {
             animate={{ width: 256, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="h-full flex flex-col p-6 border-r border-gray-900/50 shadow-2xl relative"
-            style={{
-              backgroundImage: "url('/assets/wood_texture.png')",
-              backgroundSize: 'cover',
-              backgroundPosition: 'left center'
-            }}
+            className="h-full flex flex-col p-6 border-r border-white/5 shadow-2xl relative bg-black/20 backdrop-blur-xl overflow-hidden"
           >
-            {/* Dark overlay for readability if needed */}
-            <div className="absolute inset-0 bg-black/10 pointer-events-none" />
+            {/* Local Galaxy Background REMOVED for consistency */}
+            {/* <div className="absolute inset-0 z-0"><Galaxy ... /></div> */}
 
             <div className="relative z-10 flex flex-col h-full">
               <div className="flex items-center justify-between mb-10">
-                <motion.h1
+                <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.1 }}
-                  className="text-cyan-400 text-xl font-bold tracking-widest hover:text-cyan-300 transition-colors cursor-pointer"
+                  className="flex items-center gap-2 cursor-pointer group"
                   onClick={() => navigate("/")}
                 >
-                  SENTINEL
-                </motion.h1>
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-green-400 to-emerald-600 shadow-lg shadow-green-500/30 flex items-center justify-center">
+                    <Sparkles size={18} className="text-white" />
+                  </div>
+                  <h1 className="text-white text-xl font-bold tracking-widest group-hover:text-green-400 transition-colors">
+                    SENTINEL
+                  </h1>
+                </motion.div>
                 <button
                   onClick={toggleSidebar}
-                  className="text-gray-400 hover:text-cyan-400 transition-colors"
+                  className="text-gray-400 hover:text-white transition-colors bg-white/5 p-1.5 rounded-lg hover:bg-white/10"
                 >
-                  <ChevronLeft size={20} />
+                  <ChevronLeft size={18} />
                 </button>
               </div>
 
@@ -106,16 +112,19 @@ export default function Sidebar({ onLogout }) {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.1 * index }}
                     className={`nav-item cursor-pointer flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 relative overflow-hidden group ${location.pathname === item.path
-                      ? "bg-white/10 backdrop-blur-md text-cyan-400 border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.15)] font-bold"
-                      : "text-gray-100 hover:text-white hover:bg-white/5 hover:backdrop-blur-sm border border-transparent font-medium drop-shadow-md"
+                      ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/10 text-cyan-400 border border-cyan-500/30"
+                      : "text-gray-400 hover:text-white hover:bg-white/5 border border-transparent"
                       }`}
                     onClick={() => navigate(item.path)}
                   >
+                    {location.pathname === item.path && (
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500 shadow-[0_0_10px_2px_rgba(6,182,212,0.5)]"></div>
+                    )}
                     <item.icon
                       size={18}
-                      className="group-hover:scale-110 transition-transform"
+                      className={`transition-transform duration-300 ${location.pathname === item.path ? "scale-110 drop-shadow-[0_0_5px_rgba(6,182,212,0.5)]" : "group-hover:scale-110"}`}
                     />
-                    <span>{item.label}</span>
+                    <span className="font-medium tracking-wide">{item.label}</span>
                   </motion.div>
                 ))}
               </motion.nav>
@@ -124,24 +133,30 @@ export default function Sidebar({ onLogout }) {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="mt-6 pt-4 border-t border-gray-800/50"
+                className="mt-6 pt-4 border-t border-white/10"
               >
-                <div className="flex items-center gap-3 mb-2">
-                  <User size={16} className="text-gray-400" />
-                  <p className="text-xs text-gray-300 uppercase tracking-wide font-semibold drop-shadow">
-                    My Account
-                  </p>
+                <div
+                  onClick={() => navigate('/profile')}
+                  className="flex items-center gap-3 mb-4 p-3 rounded-xl bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center border border-white/10 group-hover:border-cyan-500/50 transition-colors">
+                    <User size={20} className="text-gray-300 group-hover:text-cyan-400" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-white text-sm group-hover:text-cyan-400 transition-colors">
+                      {sessionStorage.getItem("userName") || "Cadet"}
+                    </p>
+                    {/* Level removed as requested */}
+                  </div>
                 </div>
-                <p className="font-medium text-neon">Cadet X</p>
-                <p className="text-xs text-gray-500 mb-3">Unrated</p>
 
                 <button
                   onClick={onLogout}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-200 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-300 group font-medium drop-shadow-sm"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-300 group font-medium"
                 >
                   <LogOut
                     size={16}
-                    className="group-hover:scale-110 transition-transform"
+                    className="group-hover:translate-x-1 transition-transform"
                   />
                   <span>Logout</span>
                 </button>

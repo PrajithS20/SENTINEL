@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Briefcase, MapPin, DollarSign, Clock, Star, Users, TrendingUp, Calendar, Target, Award, ExternalLink } from "lucide-react";
 import TopBar from "../components/TopBar";
+import { ParticleCard } from "../components/MagicBento";
 
 // Keep static mock data for Interviews/Offers/Stats for UI completeness (as requested only Job Matches to be scraped)
 const upcomingInterviews = [
@@ -41,7 +42,10 @@ export default function JobHub() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:8000/job-matches")
+    const token = sessionStorage.getItem("authToken");
+    fetch("http://localhost:8000/job-matches", {
+      headers: { Authorization: `Bearer ${token}` }
+    })
       .then(res => res.json())
       .then(data => {
         setJobMatches(data.jobs || []);
@@ -54,7 +58,7 @@ export default function JobHub() {
   }, []);
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#050B12]">
+    <div className="flex flex-col min-h-screen bg-transparent">
       <TopBar />
 
       <div className="flex-1 p-6">
@@ -144,67 +148,71 @@ export default function JobHub() {
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: 0.1 * index }}
-                          className="bg-gradient-to-r from-slate-700/30 to-slate-800/30 rounded-lg p-4 border border-slate-600/30 hover:border-green-500/50 transition-all duration-300 group cursor-pointer relative"
                         >
-                          <div className="absolute top-4 right-4 text-gray-600 group-hover:text-green-400 transition-colors">
-                            <ExternalLink size={16} />
-                          </div>
-
-                          <div className="flex items-start justify-between mb-3 pr-8">
-                            <div className="flex items-start gap-3">
-                              <div className="text-2xl">{job.logo || "💼"}</div>
-                              <div>
-                                <h3 className="font-semibold text-white group-hover:text-green-400 transition-colors">
-                                  {job.title}
-                                </h3>
-                                <p className="text-sm text-gray-400">{job.company}</p>
-                              </div>
+                          <ParticleCard
+                            className="bg-gradient-to-r from-slate-800/40 to-slate-900/40 rounded-xl p-6 border border-slate-700/50 hover:border-green-500/50 transition-all duration-300 group cursor-pointer relative"
+                            glowColor="34, 197, 94"
+                          >
+                            <div className="absolute top-4 right-4 text-gray-600 group-hover:text-green-400 transition-colors z-[101]">
+                              <ExternalLink size={16} />
                             </div>
-                            <div className="text-right">
-                              <div className={`text-sm font-bold px-2 py-1 rounded ${job.match_score >= 90 ? 'bg-green-500/20 text-green-400' :
+
+                            <div className="flex items-start justify-between mb-3 pr-8 relative z-[101]">
+                              <div className="flex items-start gap-3">
+                                <div className="text-2xl">{job.logo || "💼"}</div>
+                                <div>
+                                  <h3 className="font-semibold text-white group-hover:text-green-400 transition-colors">
+                                    {job.title}
+                                  </h3>
+                                  <p className="text-sm text-gray-400">{job.company}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className={`text-sm font-bold px-2 py-1 rounded ${job.match_score >= 90 ? 'bg-green-500/20 text-green-400' :
                                   job.match_score >= 80 ? 'bg-yellow-500/20 text-yellow-400' :
                                     'bg-orange-500/20 text-orange-400'
-                                }`}>
-                                {job.match_score}% Match
+                                  }`}>
+                                  {job.match_score}% Match
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="flex items-center gap-4 text-sm text-gray-400 mb-3">
-                            <div className="flex items-center gap-1">
-                              <MapPin size={14} />
-                              {job.location}
+                            <div className="flex items-center gap-4 text-sm text-gray-400 mb-3 relative z-[101]">
+                              <div className="flex items-center gap-1">
+                                <MapPin size={14} />
+                                {job.location}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <DollarSign size={14} />
+                                {job.salary}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Clock size={14} />
+                                {job.type}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <DollarSign size={14} />
-                              {job.salary}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Clock size={14} />
-                              {job.type}
-                            </div>
-                          </div>
 
-                          <p className="text-sm text-gray-300 mb-3 line-clamp-2">
-                            {job.description}
-                          </p>
+                            <p className="text-sm text-gray-300 mb-3 line-clamp-2 relative z-[101]">
+                              {job.description}
+                            </p>
 
-                          <div className="flex items-center justify-between">
-                            <div className="flex flex-wrap gap-1">
-                              {job.skills && job.skills.map((skill) => (
-                                <span
-                                  key={skill}
-                                  className="px-2 py-1 bg-slate-600/50 rounded text-xs text-gray-300"
-                                >
-                                  {skill}
-                                </span>
-                              ))}
+                            <div className="flex items-center justify-between relative z-[101]">
+                              <div className="flex flex-wrap gap-1">
+                                {job.skills && job.skills.map((skill) => (
+                                  <span
+                                    key={skill}
+                                    className="px-2 py-1 bg-slate-600/50 rounded text-xs text-gray-300"
+                                  >
+                                    {skill}
+                                  </span>
+                                ))}
+                              </div>
+                              <div className="text-right text-xs text-gray-500">
+                                <div>{job.posted}</div>
+                                <div>{job.applicants} applicants</div>
+                              </div>
                             </div>
-                            <div className="text-right text-xs text-gray-500">
-                              <div>{job.posted}</div>
-                              <div>{job.applicants} applicants</div>
-                            </div>
-                          </div>
+                          </ParticleCard>
                         </motion.div>
                       </a>
                     ))}

@@ -70,7 +70,7 @@ export default function UploadResume() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex flex-col min-h-screen bg-[#050B12]"
+      className="flex flex-col min-h-screen bg-transparent"
     >
       <div className="p-6">
         <Link to="/project-lab" className="flex items-center gap-2 text-neon hover:text-neon/80 transition-colors mb-8">

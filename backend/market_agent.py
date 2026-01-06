@@ -4,14 +4,64 @@ import urllib.parse
 import random
 from tavily import TavilyClient
 
+import datetime
+
 class MarketAnalystAgent:
     def __init__(self, grok_client):
         self.grok = grok_client
         self.tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
         self.model_id = "llama-3.3-70b-versatile"
+        # File-Based Persistent Cache
+        self.CACHE_FILE = "market_cache.json"
+        self.CACHE_DURATION = {
+            "feeds": 86400,   # 24 Hours
+            "ticker": 86400,  # 24 Hours
+            "jobs": 86400     # 24 Hours
+        }
+        self._load_cache()
+
+    def _load_cache(self):
+        if os.path.exists(self.CACHE_FILE):
+            try:
+                with open(self.CACHE_FILE, "r") as f:
+                    self.cache = json.load(f)
+            except:
+                self.cache = {}
+        else:
+            self.cache = {}
+
+    def _save_cache_to_disk(self):
+        try:
+            with open(self.CACHE_FILE, "w") as f:
+                json.dump(self.cache, f)
+        except Exception as e:
+            print(f"Failed to save cache: {e}")
 
     def _clean_json(self, text):
         return text.strip().replace("```json", "").replace("```", "")
+
+    def _get_from_cache(self, key, duration_type="feeds"):
+        if key in self.cache:
+            entry = self.cache[key]
+            # Handle string timestamps from JSON load
+            ts = entry["timestamp"]
+            if isinstance(ts, str):
+                last_update = datetime.datetime.fromisoformat(ts)
+            else:
+                last_update = ts
+            
+            elapsed = (datetime.datetime.now() - last_update).total_seconds()
+            if elapsed < self.CACHE_DURATION.get(duration_type, 86400):
+                print(f"[{key}] Serving from DISK cache (Age: {int(elapsed/3600)}h)")
+                return entry["data"]
+        return None
+
+    def _save_to_cache(self, key, data):
+        self.cache[key] = {
+            "data": data,
+            "timestamp": datetime.datetime.now().isoformat()
+        }
+        self._save_cache_to_disk()
 
     def get_live_feeds(self, role, skills):
         # Fallback if no role provided
@@ -21,9 +71,15 @@ class MarketAnalystAgent:
                 "hot_projects": ["CI/CD Pipeline", "AI Chatbot", "E-commerce API", "Portfolio Site"]
             }
 
+        cache_key = f"feeds_{role}_{skills}"
+        cached = self._get_from_cache(cache_key, "feeds")
+        if cached:
+            return cached
+
         try:
             # 1. Search for trends using Tavily
-            query = f"trending job titles and technical projects for {role} 2025"
+            # REAL SEARCH for 2025/2026 trends
+            query = f"trending job titles and specific technical project ideas for {role} {skills} late 2025 2026"
             search_result = self.tavily.search(query=query, search_depth="basic")
             context = search_result.get("results", [])
 
@@ -35,7 +91,7 @@ class MarketAnalystAgent:
             Generate a "Live Feed" for a candidate aiming for "{role}" with skills: {skills}.
             Return a JSON object with two arrays:
             1. "hot_jobs": 4 trending job titles related to {role}.
-            2. "hot_projects": 4 trending technical project ideas related to {role}.
+            2. "hot_projects": 4 SPECIFIC technical project ideas related to {role}.
             Return ONLY valid JSON.
             """
             
@@ -46,7 +102,9 @@ class MarketAnalystAgent:
                     {"role": "user", "content": prompt}
                 ]
             )
-            return json.loads(self._clean_json(response.choices[0].message.content))
+            data = json.loads(self._clean_json(response.choices[0].message.content))
+            self._save_to_cache(cache_key, data)
+            return data
             
         except Exception as e:
             print(f"Error generating feeds: {e}")
@@ -56,15 +114,66 @@ class MarketAnalystAgent:
                  "hot_projects": ["AI-Powered Dashboard", "E-commerce Microservices", "Real-time Chat App", "Crypto Portfolio Tracker"]
             }
 
+    def get_stock_ticker(self):
+        cache_key = "ticker_global"
+        cached = self._get_from_cache(cache_key, "ticker")
+        if cached:
+            return cached
+
+        try:
+            # Scrape real data for top AI/Tech companies
+            query = "current stock price and percentage change for NVIDIA, Microsoft, Google, Meta, Tesla, OpenAI valuation"
+            search_result = self.tavily.search(query=query, search_depth="basic")
+            context = search_result.get("results", [])
+            
+            prompt = f"""
+            Based on these search results:
+            {context}
+            
+            Create a list of 5-7 short stock ticker strings for a UI ticker.
+            Format exactly like: "Company (TICKER) ▲ +X.X%" or "Company (TICKER) ▼ -X.X%".
+            Include major AI players (NVDA, MSFT, GOOGL, META, TSLA).
+            If exact number isn't found, estimate based on context or use "▲ +0.0%" but try to be real.
+            Return a JSON object: {{ "ticker": [ "item1", "item2" ... ] }}
+            """
+            
+            response = self.grok.chat.completions.create(
+                model=self.model_id,
+                messages=[
+                    {"role": "system", "content": "You are a financial data parser. Return JSON only."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            data = json.loads(self._clean_json(response.choices[0].message.content))
+            self._save_to_cache(cache_key, data)
+            return data
+        except Exception as e:
+            print(f"Ticker Error: {e}")
+            # If rate limited, return fallback but maybe don't cache it so we retry later?
+            # Or cache it for a short time to prevent spam? caching for 1 min seems wise if error.
+            return {
+                "ticker": [
+                    "NVIDIA (NVDA) ▲ +2.5%", "Microsoft (MSFT) ▲ +1.2%", 
+                    "Google (GOOGL) ▲ +0.8%", "Meta (META) ▼ -0.5%", 
+                    "OpenAI (Private) ▲ Valuation Up"
+                ]
+            }
+
     def find_job_matches(self, role, skills):
         if not role:
             return []
+
+        cache_key = f"jobs_{role}_{skills}"
+        cached = self._get_from_cache(cache_key, "jobs")
+        if cached:
+            return cached
 
         try:
             # 1. Perform a real search using Tavily
             # Targeted query for specific platforms (LinkedIn, Indeed)
             query = f"latest {role} jobs {skills} (site:linkedin.com/jobs OR site:indeed.com) apply now"
             search_result = self.tavily.search(query=query, search_depth="basic", max_results=15)
+            # ... rest is same ...
             context = search_result.get("results", [])
 
             # 2. Use Grok to structure the search results into our format
@@ -107,7 +216,8 @@ class MarketAnalystAgent:
             for job in jobs:
                 if 'logo' not in job:
                     job['logo'] = random.choice(["🚀", "💡", "🐍", "☁️", "🤖", "💻", "🔥", "✨"])
-                
+            
+            self._save_to_cache(cache_key, jobs)    
             return jobs
 
         except Exception as e:

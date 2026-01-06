@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
     Upload, FileText, CheckCircle, ArrowLeft, X, Briefcase,
-    MessageCircle, Send, Bot, Sparkles, Plus, History, Copy, Edit
+    MessageCircle, Send, Bot, Sparkles, Plus, History, Copy, Edit, Trash2
 } from "lucide-react";
 import axios from "axios";
 import { useProgressStore } from "../store/useProgressStore";
@@ -34,7 +34,7 @@ export default function CareerGuidance() {
     const messagesEndRef = useRef(null);
 
     // --- Persistence & History State ---
-    const [sessionId, setSessionId] = useState(localStorage.getItem("active_chat_session") || null);
+    const [sessionId, setSessionId] = useState(sessionStorage.getItem("active_chat_session") || null);
     const [chatHistoryList, setChatHistoryList] = useState([]);
     const [showHistory, setShowHistory] = useState(false);
 
@@ -50,10 +50,13 @@ export default function CareerGuidance() {
 
     const createNewSession = async () => {
         try {
-            const res = await axios.post("http://localhost:8000/chat/new");
+            const token = sessionStorage.getItem("authToken"); // Get Token
+            const res = await axios.post("http://localhost:8000/chat/new", {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             const newId = res.data.session_id;
             setSessionId(newId);
-            localStorage.setItem("active_chat_session", newId);
+            sessionStorage.setItem("active_chat_session", newId);
             setMessages([
                 {
                     id: 'intro',
@@ -68,13 +71,27 @@ export default function CareerGuidance() {
         }
     };
 
+    // Helper to remove JSON blocks from chat display
+    const cleanMessageText = (text) => {
+        if (!text) return "";
+        let cleaned = text.replace(/```(?:json)?\s*[\s\S]*?\s*```/g, "").trim();
+        const rawJsonStart = cleaned.lastIndexOf('{ "projects":');
+        if (rawJsonStart > -1) {
+            cleaned = cleaned.substring(0, rawJsonStart).trim();
+        }
+        return cleaned;
+    };
+
     const loadChatHistory = async (sessId) => {
         try {
-            const res = await axios.get(`http://localhost:8000/chat/history/${sessId}`);
+            const token = sessionStorage.getItem("authToken"); // Get Token
+            const res = await axios.get(`http://localhost:8000/chat/history/${sessId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             // Transform to UI format
             const hist = res.data.messages.map((m, i) => ({
                 id: i,
-                text: m.content,
+                text: cleanMessageText(m.content), // Apply cleaning to history
                 sender: m.role === 'assistant' ? 'bot' : m.role,
                 timestamp: new Date()
             }));
@@ -98,14 +115,35 @@ export default function CareerGuidance() {
 
     const loadAllSessions = async () => {
         try {
-            const res = await axios.get("http://localhost:8000/chat/sessions");
+            const token = sessionStorage.getItem("authToken"); // Get Token
+            const res = await axios.get("http://localhost:8000/chat/sessions", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             setChatHistoryList(res.data);
         } catch (e) { console.error(e); }
     }
 
+    const deleteSession = async (sessId) => {
+        if (!confirm("Are you sure you want to delete this chat?")) return;
+        try {
+            const token = sessionStorage.getItem("authToken");
+            await axios.delete(`http://localhost:8000/chat/sessions/${sessId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            // If deleting active session, switch to new one or clear
+            if (sessionId === sessId) {
+                setSessionId(null);
+                setMessages([]);
+                sessionStorage.removeItem("active_chat_session");
+                createNewSession();
+            }
+            loadAllSessions();
+        } catch (e) { console.error("Delete failed", e); }
+    };
+
     const switchSession = (id) => {
         setSessionId(id);
-        localStorage.setItem("active_chat_session", id);
+        sessionStorage.setItem("active_chat_session", id);
         setShowHistory(false);
     };
 
@@ -135,8 +173,12 @@ export default function CareerGuidance() {
 
         try {
             // Ensure backend URL is correct
+            const token = sessionStorage.getItem("authToken");
             const response = await axios.post("http://localhost:8000/analyze", formData, {
-                headers: { "Content-Type": "multipart/form-data" },
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                    Authorization: `Bearer ${token}`
+                },
             });
 
             console.log("Analysis Data:", response.data);
@@ -168,9 +210,12 @@ export default function CareerGuidance() {
 
         try {
             // Updated to send JSON with session_id
+            const token = sessionStorage.getItem("authToken");
             const res = await axios.post("http://localhost:8000/chat", {
                 message: userMsg.text,
                 session_id: sessionId
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
             });
             let responseText = res.data.response;
 
@@ -192,17 +237,7 @@ export default function CareerGuidance() {
                             color: p.color || "from-blue-500 to-cyan-600"
                         }));
 
-                        // FETCH SOURCE OF TRUTH (Backend) to avoid overwriting existing levels
-                        let currentProjects = [];
-                        try {
-                            const resProx = await axios.get("http://localhost:8000/market-match");
-                            if (resProx.data.projects) {
-                                currentProjects = resProx.data.projects;
-                            }
-                        } catch (err) {
-                            console.warn("Could not fetch existing projects, using store fallback", err);
-                            currentProjects = store.generatedProjects || [];
-                        }
+                        const currentProjects = store.generatedProjects || [];
 
                         // 1. Identify which levels are being updated
                         const updatedLevels = new Set();
@@ -230,10 +265,19 @@ export default function CareerGuidance() {
                         setProjects(merged);
 
                         // 4. Persist to Backend (Save for Refresh)
-                        await axios.post("http://localhost:8000/update-generated-projects", { projects: merged });
+                        axios.post("http://localhost:8000/update-generated-projects", { projects: merged })
+                            .catch(err => console.error("Failed to save projects persistence:", err));
 
-                        // Remove JSON from display text (Robust Regex)
-                        responseText = responseText.replace(/```(?:json)?[\s\S]*?```/gi, "").trim();
+                        // Remove JSON from display text
+                        // FIX: Aggressive regex to catch ```json ... ``` AND raw JSON blocks if leaked
+                        responseText = responseText.replace(/```(?:json)?\s*[\s\S]*?\s*```/g, "").trim();
+
+                        // Also remove pure raw JSON if it exists at the end (sometimes LLM forgets code blocks)
+                        const rawJsonStart = responseText.lastIndexOf('{ "projects":');
+                        if (rawJsonStart > -1) {
+                            responseText = responseText.substring(0, rawJsonStart).trim();
+                        }
+
                         responseText += "\n\n✅ **Project Lab updated!** (Refreshed specific levels)";
                     }
                 } catch (e) {
@@ -261,7 +305,7 @@ export default function CareerGuidance() {
     };
 
     return (
-        <div className="flex flex-col min-h-screen bg-[#050B12] p-6 text-gray-200">
+        <div className="flex flex-col min-h-screen bg-transparent p-6 text-gray-200">
             <Link to="/" className="flex items-center gap-2 text-neon hover:text-neon/80 mb-6 w-fit">
                 <ArrowLeft size={20} /> Back to Dashboard
             </Link>
@@ -386,10 +430,24 @@ export default function CareerGuidance() {
                                     {chatHistoryList.map(s => (
                                         <div
                                             key={s.id}
-                                            onClick={() => switchSession(s.id)}
-                                            className={`p-3 border-b border-gray-800 hover:bg-gray-800 cursor-pointer text-sm truncate ${s.id === sessionId ? 'bg-gray-800 text-neon' : 'text-gray-400'}`}
+                                            className={`p-3 border-b border-gray-800 flex justify-between items-center group hover:bg-gray-800 transition-colors ${s.id === sessionId ? 'bg-gray-800 text-neon' : 'text-gray-400'}`}
                                         >
-                                            {s.title}
+                                            <span
+                                                onClick={() => switchSession(s.id)}
+                                                className="cursor-pointer truncate flex-1"
+                                            >
+                                                {s.title}
+                                            </span>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteSession(s.id);
+                                                }}
+                                                className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-opacity"
+                                                title="Delete Chat"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
                                         </div>
                                     ))}
                                 </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
   Play,
@@ -12,151 +12,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import TopBar from "../components/TopBar";
-
-const projectPhases = {
-  "personal-portfolio": {
-    title: "Personal Portfolio Website",
-    phases: [
-      {
-        id: 1,
-        title: "Project Setup",
-        description:
-          "Set up your development environment and create the basic project structure",
-        tasks: [
-          "Initialize a new React project",
-          "Install necessary dependencies (React Router, Tailwind CSS)",
-          "Create basic folder structure",
-          "Set up development server",
-        ],
-        codeTemplate: `// Phase 1: Project Setup
-// Create a new React project with Vite
-// npm create vite@latest my-portfolio -- --template react
-// cd my-portfolio
-// npm install
-
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App.jsx';
-import './index.css';
-
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);`,
-        hints: [
-          "Use Vite for faster development",
-          "Install Tailwind CSS for styling",
-          "Create components folder structure",
-          "Set up React Router for navigation",
-        ],
-      },
-      {
-        id: 2,
-        title: "Basic Layout",
-        description:
-          "Create the main layout with header, navigation, and footer",
-        tasks: [
-          "Create Header component with navigation",
-          "Build Hero section",
-          "Add About section",
-          "Create Contact section",
-        ],
-        codeTemplate: `// Phase 2: Basic Layout
-import { useState } from 'react';
-
-function Header() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  return (
-    <header className="bg-white shadow-lg">
-      <nav className="container mx-auto px-6 py-4">
-        <div className="flex justify-between items-center">
-          <div className="text-2xl font-bold text-gray-800">
-            My Portfolio
-          </div>
-          <div className="hidden md:flex space-x-8">
-            <a href="#home" className="text-gray-600 hover:text-blue-600">Home</a>
-            <a href="#about" className="text-gray-600 hover:text-blue-600">About</a>
-            <a href="#projects" className="text-gray-600 hover:text-blue-600">Projects</a>
-            <a href="#contact" className="text-gray-600 hover:text-blue-600">Contact</a>
-          </div>
-        </div>
-      </nav>
-    </header>
-  );
-}
-
-export default Header;`,
-        hints: [
-          "Use responsive design with Tailwind classes",
-          "Add smooth scrolling for navigation links",
-          "Include mobile hamburger menu",
-          "Use semantic HTML elements",
-        ],
-      },
-      {
-        id: 3,
-        title: "Styling & Animation",
-        description:
-          "Add beautiful styling and smooth animations to your portfolio",
-        tasks: [
-          "Style all components with Tailwind CSS",
-          "Add Framer Motion animations",
-          "Implement responsive design",
-          "Add hover effects and transitions",
-        ],
-        codeTemplate: `// Phase 3: Styling & Animation
-import { motion } from 'framer-motion';
-
-const Hero = () => {
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 50 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8 }}
-      className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-20"
-    >
-      <div className="container mx-auto px-6 text-center">
-        <motion.h1
-          initial={{ scale: 0.5 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-          className="text-5xl font-bold mb-4"
-        >
-          Welcome to My Portfolio
-        </motion.h1>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4, duration: 0.5 }}
-          className="text-xl mb-8"
-        >
-          Full Stack Developer & UI/UX Designer
-        </motion.p>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="bg-white text-blue-600 px-8 py-3 rounded-full font-semibold hover:bg-gray-100 transition-colors"
-        >
-          View My Work
-        </motion.button>
-      </div>
-    </motion.section>
-  );
-};
-
-export default Hero;`,
-        hints: [
-          "Use Framer Motion for smooth animations",
-          "Apply consistent color scheme",
-          "Add loading states and micro-interactions",
-          "Ensure accessibility with proper contrast",
-        ],
-      },
-    ],
-  },
-};
+import axios from "axios";
 
 export default function MyWorkspace() {
   const { projectId } = useParams();
@@ -164,44 +20,104 @@ export default function MyWorkspace() {
   const [searchParams] = useSearchParams();
   const initialPhase = parseInt(searchParams.get("phase")) || 1;
   const [currentPhase, setCurrentPhase] = useState(initialPhase);
-  const [completedPhases, setCompletedPhases] = useState([1]);
+  const [completedPhases, setCompletedPhases] = useState([]);
   const [showHints, setShowHints] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
+  const [project, setProject] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const project = projectPhases[projectId];
-  const phase = project?.phases.find((p) => p.id === currentPhase);
+  // Load Project Data
+  useEffect(() => {
+    if (projectId) {
+      axios.get(`http://localhost:8000/project/${projectId}`)
+        .then(res => {
+          setProject(res.data);
+          // Determine completed phases based on current_phase from backend
+          // Assuming backend current_phase means "this is the one to WORK on", so all previous are done.
+          const completed = [];
+          if (res.data.phases) {
+            res.data.phases.forEach(p => {
+              if (p.id < res.data.current_phase) completed.push(p.id);
+            });
+          }
+          setCompletedPhases(completed);
+          setCurrentPhase(res.data.current_phase);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error("Failed to load project", err);
+          setLoading(false);
+        });
+    }
+  }, [projectId]);
 
-  const [code, setCode] = useState(() => phase?.codeTemplate || "");
+  const phase = project?.phases?.find((p) => p.id === currentPhase);
+  const [code, setCode] = useState("");
 
   useEffect(() => {
-    if (phase && phase.codeTemplate !== code) {
-      setCode(phase.codeTemplate);
+    if (phase && !code) {
+      // Use a generic template if backend doesn't provide one, or use description
+      setCode(`// Phase ${phase.id}: ${phase.title}\n// ${phase.description}\n\nfunction solution() {\n  // Write your code here\n}`);
     }
   }, [phase, code]);
 
-  const handlePhaseComplete = () => {
-    if (!completedPhases.includes(currentPhase + 1)) {
-      setCompletedPhases([...completedPhases, currentPhase + 1]);
+  const handlePhaseComplete = async () => {
+    try {
+      await axios.post("http://localhost:8000/project/unlock-phase", {
+        project_id: projectId,
+        phase_id: currentPhase
+      });
+
+      setCompletedPhases([...completedPhases, currentPhase]);
+      // Update local state to next phase
+      const nextPhase = currentPhase + 1;
+      setCurrentPhase(nextPhase);
+
+      // Refresh project data to ensure sync
+      const res = await axios.get(`http://localhost:8000/project/${projectId}`);
+      setProject(res.data);
+
+    } catch (err) {
+      console.error("Failed to unlock phase", err);
+      alert("Error updating progress. Check backend console.");
     }
-    // In a real app, you'd save progress to backend
   };
 
   const handleCodeUpload = () => {
-    // Handle code upload logic
-    alert("Code uploaded successfully!");
+    // In a real app, you might send the code to backend here too
     handlePhaseComplete();
   };
 
   const getAIHint = () => {
-    const hints = phase?.hints || [];
+    // Backend doesn't store hints per phase in the main model yet, 
+    // but we can simulate or fetch from a new endpoint if we had one.
+    // For now, using generic hints or descriptions.
+    const hints = [
+      "Focus on the main function logic.",
+      "Remember to handle edge cases.",
+      "Check the documentation for this specific technology."
+    ];
+    if (phase?.description) hints.push(`Review the goal: ${phase.description}`);
+
     const randomHint = hints[Math.floor(Math.random() * hints.length)];
     setAiMessage(`💡 Hint: ${randomHint}`);
-    setTimeout(() => setAiMessage(""), 5000);
+    setTimeout(() => setAiMessage(""), 8000);
   };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-transparent">
+        <TopBar />
+        <div className="flex-1 flex items-center justify-center text-gray-400">
+          Loading Workspace...
+        </div>
+      </div>
+    );
+  }
 
   if (!project) {
     return (
-      <div className="flex flex-col min-h-screen bg-[#050B12]">
+      <div className="flex flex-col min-h-screen bg-transparent">
         <TopBar />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-white">Project not found</div>
@@ -211,7 +127,7 @@ export default function MyWorkspace() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#050B12]">
+    <div className="flex flex-col min-h-screen bg-transparent">
       <TopBar />
 
       <div className="flex-1 flex">
@@ -227,41 +143,40 @@ export default function MyWorkspace() {
             </button>
             <h1 className="text-xl font-bold text-white">{project.title}</h1>
             <p className="text-sm text-gray-400 mt-1">
-              Phase {currentPhase} of {project.phases.length}
+              Phase {currentPhase} of {project.total_phases || project.phases.length}
             </p>
           </div>
 
-          <div className="flex-1 p-4 space-y-3">
-            {project.phases.map((phaseItem) => (
+          <div className="flex-1 p-4 space-y-3 overflow-y-auto">
+            {project.phases && project.phases.map((phaseItem) => (
               <motion.div
                 key={phaseItem.id}
                 whileHover={{ scale: 1.02 }}
-                className={`p-4 rounded-lg border transition-all cursor-pointer ${
-                  currentPhase === phaseItem.id
-                    ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-400"
-                    : completedPhases.includes(phaseItem.id)
+                className={`p-4 rounded-lg border transition-all cursor-pointer ${currentPhase === phaseItem.id
+                  ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-400"
+                  : completedPhases.includes(phaseItem.id) || phaseItem.id < currentPhase
                     ? "bg-green-500/20 border-green-500/50 text-green-400"
-                    : phaseItem.id <= Math.max(...completedPhases) + 1
-                    ? "bg-slate-700/50 border-slate-600/50 text-gray-300 hover:border-cyan-500/30"
                     : "bg-slate-800/50 border-slate-700/50 text-gray-500 cursor-not-allowed"
-                }`}
+                  }`}
                 onClick={() => {
-                  if (phaseItem.id <= Math.max(...completedPhases) + 1) {
+                  // Allow clicking if it's the current phase or a completed one (to review)
+                  // or the immediate next one if just completed
+                  if (phaseItem.id <= Math.max(0, ...completedPhases) + 1) {
                     setCurrentPhase(phaseItem.id);
                   }
                 }}
               >
                 <div className="flex items-center gap-3">
-                  {completedPhases.includes(phaseItem.id) ? (
+                  {completedPhases.includes(phaseItem.id) || phaseItem.id < project.current_phase ? (
                     <CheckCircle size={20} className="text-green-400" />
-                  ) : phaseItem.id > Math.max(...completedPhases) + 1 ? (
+                  ) : phaseItem.id > project.current_phase ? (
                     <Lock size={20} className="text-gray-500" />
                   ) : (
                     <Play size={20} />
                   )}
                   <div>
                     <h3 className="font-semibold text-sm">{phaseItem.title}</h3>
-                    <p className="text-xs opacity-75 mt-1">
+                    <p className="text-xs opacity-75 mt-1 line-clamp-2">
                       {phaseItem.description}
                     </p>
                   </div>
@@ -299,7 +214,7 @@ export default function MyWorkspace() {
                   className="bg-green-500/20 border border-green-500/50 text-green-400 px-4 py-2 rounded-lg hover:bg-green-500/30 transition-colors flex items-center gap-2"
                 >
                   <Upload size={16} />
-                  Upload Code
+                  Submit Phase
                 </motion.button>
               </div>
             </div>
@@ -323,17 +238,8 @@ export default function MyWorkspace() {
                   </div>
                   <div className="flex-1 p-4 space-y-4">
                     <div className="space-y-2">
-                      <h4 className="text-sm font-medium text-gray-300">
-                        Available Hints:
-                      </h4>
-                      {phase?.hints.map((hint, index) => (
-                        <div
-                          key={index}
-                          className="text-sm text-gray-400 bg-slate-700/30 p-3 rounded-lg"
-                        >
-                          💡 {hint}
-                        </div>
-                      ))}
+                      {/* Backend doesn't provide explicit hints list, so we omit listing them unless we mock or update backend */}
+                      <p className="text-sm text-gray-400">AI can generate hints based on the current phase objective.</p>
                     </div>
                     <motion.button
                       whileHover={{ scale: 1.02 }}
@@ -341,13 +247,13 @@ export default function MyWorkspace() {
                       onClick={getAIHint}
                       className="w-full bg-purple-500/20 border border-purple-500/50 text-purple-400 py-2 px-4 rounded-lg hover:bg-purple-500/30 transition-colors"
                     >
-                      Get Random Hint
+                      Get AI Hint
                     </motion.button>
                     {aiMessage && (
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="bg-purple-500/10 border border-purple-500/30 text-purple-300 p-3 rounded-lg"
+                        className="bg-purple-500/10 border border-purple-500/30 text-purple-300 p-3 rounded-lg text-sm"
                       >
                         {aiMessage}
                       </motion.div>
@@ -364,11 +270,11 @@ export default function MyWorkspace() {
                   <Code size={20} className="text-cyan-400" />
                   <span className="text-gray-300">Code Editor</span>
                   <span className="text-xs text-gray-500 ml-auto">
-                    JavaScript/React
+                    {project.tech_stack || "JavaScript/React"}
                   </span>
                 </div>
               </div>
-              <div className="flex-1 p-4">
+              <div className="flex-1 p-4 h-full">
                 <textarea
                   value={code}
                   onChange={(e) => setCode(e.target.value)}

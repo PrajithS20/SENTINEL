@@ -46,7 +46,7 @@ export default function ProjectPhases() {
     const phases = project.phases || [];
 
     return (
-        <div className="min-h-screen bg-[#050B12] p-6 font-primary">
+        <div className="min-h-screen bg-transparent p-6 font-primary">
             <div className="max-w-6xl mx-auto">
                 {/* Header */}
                 <div className="flex items-center gap-4 mb-8">
